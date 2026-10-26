@@ -505,12 +505,14 @@
   // funciona assim) que chama o Apps Script por fetch; o endereço do setor vem em ?api=... e fica salvo no aparelho.
   var MODO_EXTERNO = (typeof google === 'undefined' || !google.script || !google.script.run);
   var API_URL = '';
+  var API_PADRAO = 'https://script.google.com/macros/s/AKfycbymGhvNuoH1Ak9nFlCByQ48uQ2aEi8xjpZoeGJ49Qnb1h6pHTi0JfobKQ4cPSRbE_hI/exec';   // preenchido pelo build_static.py --api LINK (página já vem apontando para o setor)
   function lerApiUrl() {
     try {
       var q = new URLSearchParams(location.search).get('api');
       if (q) { localStorage.setItem('inv_api', q); return q; }
+      if (API_PADRAO) return API_PADRAO;
       return localStorage.getItem('inv_api') || '';
-    } catch (e) { return ''; }
+    } catch (e) { return API_PADRAO; }
   }
   function api(nome) {
     var args = Array.prototype.slice.call(arguments, 1);
