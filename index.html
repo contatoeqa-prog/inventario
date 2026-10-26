@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inventário Patrimonial</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <style>
+  :root {
+    --azul: #1a56db; --azul-escuro: #123a99; --verde: #15803d; --verde-bg: #dcfce7;
+    --vermelho: #dc2626; --ambar: #92400e; --ambar-bg: #fef3c7; --ambar-borda: #f59e0b;
+    --cinza-bg: #f4f5f7; --cinza-borda: #e2e4e9; --cinza-texto: #5b6472; --preto: #111827;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--cinza-bg); color: var(--preto);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 15px;
+    -webkit-tap-highlight-color: transparent; }
+  .tela { display: none; min-height: 100vh; flex-direction: column; }
+  .tela.ativa { display: flex; }
+  .centro { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--cinza-texto); }
+  .spinner { width: 34px; height: 34px; border-radius: 50%; border: 4px solid var(--cinza-borda); border-top-color: var(--azul);
+    animation: girar .8s linear infinite; margin-bottom: 12px; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+
+  .cabecalho { background: var(--azul); color: #fff; padding: 22px 20px 18px; }
+  .cabecalho h1 { margin: 0 0 4px; font-size: 20px; }
+  .cabecalho-linha { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .subtitulo { margin: 0; opacity: .92; font-size: 14px; }
+
+  .conteudo { padding: 20px; flex: 1; width: 100%; margin: 0 auto; }
+  .conteudo.estreito { max-width: 520px; }
+  .conteudo.largo { max-width: 1040px; }
+
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--cinza-texto); margin: 14px 0 5px; }
+  label.check-linha { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--preto); margin: 10px 0; }
+  input[type=text], input[type=email], input[type=password], input[type=date], textarea, select {
+    width: 100%; padding: 11px 13px; font-size: 16px; border: 1.5px solid var(--cinza-borda); border-radius: 10px;
+    background: #fff; font-family: inherit; color: var(--preto); }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--azul); }
+  input[type=checkbox] { width: 18px; height: 18px; flex-shrink: 0; }
+  input[type=file] { width: 100%; padding: 10px; border: 1.5px dashed var(--cinza-borda); border-radius: 10px; background: #fff; font-size: 14px; }
+  .ajuda { font-size: 12.5px; color: var(--cinza-texto); margin: 6px 0 0; line-height: 1.4; }
+  .centralizado { text-align: center; margin-top: 18px; }
+
+  .btn-primario { width: 100%; padding: 14px; margin-top: 18px; background: var(--azul); color: #fff; border: 0; border-radius: 12px;
+    font-size: 16px; font-weight: 600; cursor: pointer; }
+  .btn-primario.auto { width: auto; padding: 11px 20px; font-size: 15px; }
+  .btn-primario:active { background: var(--azul-escuro); }
+  .btn-primario:disabled { background: #a3b3d1; cursor: default; }
+  .btn-secundario { width: 100%; padding: 13px; margin-top: 10px; background: #fff; color: var(--azul); border: 1.5px solid var(--azul);
+    border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-pequeno { padding: 8px 14px; background: var(--azul); color: #fff; border: 0; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-pequeno.claro { background: #fff; color: var(--azul); border: 1.5px solid var(--azul); }
+  .btn-pequeno.perigo { background: #fff; color: var(--vermelho); border: 1.5px solid var(--vermelho); }
+  .btn-pequeno:disabled { opacity: .5; cursor: default; }
+  .btn-link { background: none; border: 0; color: #fff; font-size: 13px; padding: 6px; cursor: pointer; }
+  .btn-link-topo { display: block; padding: 0 0 6px; text-align: left; }
+  .status-msg { margin-top: 12px; font-size: 14px; }
+  .status-msg.erro { color: var(--vermelho); }
+  .status-msg.sucesso { color: var(--verde); }
+
+  /* Gestão */
+  .barra-topo { background: var(--preto); color: #fff; display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 18px; gap: 10px; flex-wrap: wrap; }
+  .barra-sub { display: block; font-size: 12px; opacity: .75; margin-top: 2px; }
+  .barra-acoes { display: flex; gap: 6px; }
+  .btn-barra { background: #2a3140; color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+  .abas { display: flex; gap: 2px; overflow-x: auto; background: #fff; border-bottom: 1px solid var(--cinza-borda); padding: 0 10px; position: sticky; top: 0; z-index: 5; }
+  .aba { background: none; border: 0; padding: 14px 14px; font-size: 14px; font-weight: 600; color: var(--cinza-texto); cursor: pointer;
+    border-bottom: 3px solid transparent; white-space: nowrap; }
+  .aba.ativa { color: var(--azul); border-bottom-color: var(--azul); }
+  .painel { display: none; }
+  .painel.ativo { display: block; }
+  .carregando-txt { color: var(--cinza-texto); padding: 20px 0; }
+
+  .cartao { background: #fff; border: 1px solid var(--cinza-borda); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  .cartao h3 { margin: 0 0 8px; font-size: 16px; }
+  .grade-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 14px; }
+  .linha-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .linha-form input { max-width: 200px; }
+
+  .resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .num-card { background: #fff; border: 1px solid var(--cinza-borda); border-radius: 14px; padding: 14px 16px; }
+  .num-card .n { font-size: 26px; font-weight: 700; }
+  .num-card .r { font-size: 12px; color: var(--cinza-texto); font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+  .barra { height: 9px; background: var(--cinza-borda); border-radius: 6px; overflow: hidden; }
+  .barra > i { display: block; height: 100%; background: var(--azul); }
+  .barra.ok > i { background: var(--verde); }
+  .prazo-faixa { border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-weight: 600; background: #e0e7ff; color: #1e3a8a; }
+  .prazo-faixa.alerta { background: var(--ambar-bg); color: var(--ambar); }
+  .prazo-faixa.vencido { background: #fee2e2; color: #991b1b; }
+
+  details.bloco { background: #fff; border: 1px solid var(--cinza-borda); border-radius: 14px; margin-bottom: 10px; }
+  details.bloco > summary { list-style: none; padding: 14px 16px; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
+  details.bloco > summary::-webkit-details-marker { display: none; }
+  details.bloco > summary .barra { grid-column: 1 / -1; }
+  .bloco-nome { font-weight: 700; }
+  .bloco-num { color: var(--cinza-texto); font-size: 13px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 12px; color: var(--cinza-texto); text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid var(--cinza-borda); }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--cinza-borda); vertical-align: top; }
+  .rolagem { overflow-x: auto; }
+  .tag { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #e5e7eb; color: #374151; }
+  .tag.ok { background: var(--verde-bg); color: var(--verde); }
+  .tag.aviso { background: var(--ambar-bg); color: var(--ambar); }
+  .tag.erro { background: #fee2e2; color: #991b1b; }
+
+  .segmento { display: inline-flex; background: #e5e7eb; border-radius: 10px; padding: 3px; margin-bottom: 14px; }
+  .seg { border: 0; background: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; color: var(--cinza-texto); cursor: pointer; }
+  .seg.ativo { background: #fff; color: var(--azul); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+  .filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .acoes-lote { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .acoes-lote .check-linha { margin: 0; }
+  .item-linha { background: #fff; border: 1px solid var(--cinza-borda); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: start; }
+  .item-linha .desc { font-weight: 600; }
+  .item-linha .meta { font-size: 13px; color: var(--cinza-texto); grid-column: 2; }
+  .item-linha .acao { grid-row: 1 / span 3; grid-column: 3; text-align: right; }
+  .item-linha select { width: auto; padding: 7px 10px; font-size: 14px; }
+  .lista-checks { max-height: 220px; overflow-y: auto; border: 1.5px solid var(--cinza-borda); border-radius: 10px; padding: 4px 12px; background: #fff; }
+  .lista-arquivos .arquivo-item { display: flex; justify-content: space-between; background: #fff; border: 1px solid var(--cinza-borda);
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-top: 6px; gap: 8px; }
+  .res-ok { color: var(--verde); } .res-erro { color: var(--vermelho); }
+
+  /* Inventário */
+  .lista-clicavel { background: #fff; border-radius: 12px; overflow: hidden; border: 1.5px solid var(--cinza-borda); }
+  .lista-clicavel .linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px;
+    border-bottom: 1px solid var(--cinza-borda); cursor: pointer; }
+  .lista-clicavel .linha:last-child { border-bottom: 0; }
+  .lista-clicavel .linha:active { background: var(--cinza-bg); }
+  .lista-clicavel .contagem { color: var(--cinza-texto); font-size: 13px; margin-left: auto; white-space: nowrap; }
+  .lista-clicavel .seta { color: var(--cinza-texto); }
+  .topo-scanner { background: var(--preto); color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 13px; }
+  #reader { width: 100%; background: #000; }
+  .dica-scanner { text-align: center; padding: 12px; color: var(--cinza-texto); font-size: 13px; }
+  .entrada-manual { display: flex; gap: 8px; padding: 0 16px 14px; max-width: 520px; width: 100%; margin: 0 auto; }
+  .entrada-manual input { flex: 1; }
+  .entrada-manual button { padding: 0 18px; border-radius: 10px; border: 0; background: var(--azul); color: #fff; font-weight: 600; }
+  .card-item { background: #fff; border-radius: 14px; padding: 18px; border: 1.5px solid var(--cinza-borda); }
+  button.escolha { display:block; width:100%; text-align:left; margin-bottom:10px; font:inherit; cursor:pointer; line-height:1.5; }
+  .card-item .campo { margin-bottom: 10px; }
+  .card-item .rotulo { font-size: 12px; color: var(--cinza-texto); font-weight: 600; text-transform: uppercase; }
+  .card-item .valor { font-size: 15px; margin-top: 2px; word-break: break-word; }
+  .card-item .valor.destaque { font-size: 18px; font-weight: 700; }
+  .alerta-caixa { background: var(--ambar-bg); border: 1.5px solid var(--ambar-borda); border-radius: 12px; padding: 13px 15px; margin-bottom: 14px;
+    display: flex; flex-direction: column; gap: 3px; color: var(--ambar); }
+  .alerta-caixa strong { font-size: 15px; } .alerta-caixa span { font-size: 13px; }
+  .alerta-caixa.info { background: #e0e7ff; border-color: #818cf8; color: #1e3a8a; }
+  #preview-foto img, #preview-foto-nc img { max-width: 100%; border-radius: 10px; margin-top: 10px; }
+
+  .modal { position: fixed; inset: 0; background: rgba(17,24,39,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+  .modal-caixa { background: #fff; border-radius: 16px; padding: 22px; max-width: 460px; width: 100%; max-height: 90vh; overflow-y: auto; }
+  .credencial { background: var(--cinza-bg); border-radius: 10px; padding: 12px 14px; margin: 10px 0; font-size: 14px; word-break: break-all; }
+  .credencial b { display: block; font-size: 12px; color: var(--cinza-texto); text-transform: uppercase; }
+  .credencial code { font-size: 20px; font-weight: 700; letter-spacing: .04em; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--preto); color: #fff;
+    padding: 12px 20px; border-radius: 10px; font-size: 14px; opacity: 0; transition: all .25s; max-width: 90%; text-align: center; z-index: 99; }
+  .toast.mostrar { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (max-width: 600px) { .item-linha { grid-template-columns: auto 1fr; } .item-linha .acao { grid-row: auto; grid-column: 2; text-align: left; } }
+</style>
+
+</head>
+<body>
+<div id="app">
+
+  <!-- CARREGANDO -->
+  <div id="tela-carregando" class="tela ativa">
+    <div class="centro"><div class="spinner"></div><p>Carregando...</p></div>
+  </div>
+
+  <!-- ENDEREÇO DO SETOR (só na versão hospedada fora do Google) -->
+  <div id="tela-api" class="tela">
+    <div class="cabecalho"><h1>Inventário Patrimonial</h1><p class="subtitulo">Informe o endereço do setor</p></div>
+    <div class="conteudo estreito">
+      <label for="input-api">Link do app do setor (termina em /exec)</label>
+      <input id="input-api" type="url" placeholder="https://script.google.com/macros/s/.../exec" autocapitalize="off" autocorrect="off">
+      <button id="btn-salvar-api" class="btn-primario">Continuar</button>
+    </div>
+  </div>
+
+  <!-- PRIMEIRO ACESSO: ativação -->
+  <div id="tela-ativacao" class="tela">
+    <div class="cabecalho"><h1>Configuração inicial</h1><p class="subtitulo">Crie o acesso da pessoa que vai gerir o inventário.</p></div>
+    <div class="conteudo estreito">
+      <label for="at-codigo">Código de ativação</label>
+      <input type="text" id="at-codigo" placeholder="ATIV-XXXXXX" autocapitalize="characters" autocomplete="off">
+      <p class="ajuda">Está na aba <b>Config</b> da planilha (linha <b>CodigoAtivacao</b>). Serve para garantir que só quem é dono da planilha configura o app.</p>
+      <label for="at-setor">Nome do setor / departamento</label>
+      <input type="text" id="at-setor" placeholder="Ex: Engenharia Química - EQA">
+      <label for="at-nome">Seu nome</label>
+      <input type="text" id="at-nome" autocomplete="name">
+      <label for="at-email">Seu e-mail</label>
+      <input type="email" id="at-email" autocomplete="email">
+      <label for="at-senha">Crie uma senha (mín. 8, com letras e números)</label>
+      <input type="password" id="at-senha" autocomplete="new-password">
+      <label for="at-senha2">Repita a senha</label>
+      <input type="password" id="at-senha2" autocomplete="new-password">
+      <button id="btn-ativar" class="btn-primario">Criar acesso de gestão</button>
+      <div id="at-status" class="status-msg"></div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="tela-login" class="tela">
+    <div class="cabecalho"><h1>Inventário patrimonial</h1><p class="subtitulo" id="login-setor"></p></div>
+    <div class="conteudo estreito">
+      <label for="lg-email">E-mail</label>
+      <input type="email" id="lg-email" autocomplete="username">
+      <label for="lg-senha">Senha</label>
+      <input type="password" id="lg-senha" autocomplete="current-password">
+      <button id="btn-entrar" class="btn-primario">Entrar</button>
+      <div id="lg-status" class="status-msg"></div>
+      <p class="ajuda centralizado"><a href="#" id="link-trocar-api">Trocar o endereço do setor</a></p>
+      <p class="ajuda centralizado">Primeiro acesso? Use a senha provisória que a gestão enviou. O app vai pedir para você criar uma nova.</p>
+    </div>
+  </div>
+
+  <!-- TROCAR SENHA -->
+  <div id="tela-senha" class="tela">
+    <div class="cabecalho"><h1 id="sn-titulo">Trocar senha</h1><p class="subtitulo" id="sn-sub"></p></div>
+    <div class="conteudo estreito">
+      <label for="sn-atual">Senha atual</label>
+      <input type="password" id="sn-atual" autocomplete="current-password">
+      <label for="sn-nova">Nova senha (mín. 8, com letras e números)</label>
+      <input type="password" id="sn-nova" autocomplete="new-password">
+      <label for="sn-nova2">Repita a nova senha</label>
+      <input type="password" id="sn-nova2" autocomplete="new-password">
+      <button id="btn-salvar-senha" class="btn-primario">Salvar nova senha</button>
+      <button id="btn-cancelar-senha" class="btn-secundario">Cancelar</button>
+      <div id="sn-status" class="status-msg"></div>
+    </div>
+  </div>
+
+  <!-- ============ GESTÃO ============ -->
+  <div id="tela-gestao" class="tela">
+    <div class="barra-topo">
+      <div><strong>Gestão do inventário</strong><span class="barra-sub" id="gs-setor"></span></div>
+      <div class="barra-acoes">
+        <button class="btn-barra" id="gs-ir-inventario">Fazer inventário</button>
+        <button class="btn-barra" id="gs-trocar-senha">Senha</button>
+        <button class="btn-barra" id="gs-sair">Sair</button>
+      </div>
+    </div>
+    <nav class="abas" id="gs-abas">
+      <button class="aba ativa" data-aba="andamento">Andamento</button>
+      <button class="aba" data-aba="inventariados">Inventariados</button>
+      <button class="aba" data-aba="usuarios">Usuários</button>
+      <button class="aba" data-aba="ambientes">Ambientes</button>
+      <button class="aba" data-aba="avisos">Prazo e avisos</button>
+      <button class="aba" data-aba="importar">Importar</button>
+    </nav>
+
+    <div class="conteudo largo">
+      <!-- Andamento -->
+      <section class="painel ativo" id="painel-andamento"><div id="andamento-corpo" class="carregando-txt">Carregando...</div></section>
+
+      <!-- Inventariados -->
+      <section class="painel" id="painel-inventariados">
+        <div class="segmento">
+          <button class="seg ativo" data-sub="inv">Itens inventariados</button>
+          <button class="seg" data-sub="nc">Não catalogados</button>
+        </div>
+        <div id="sub-inv">
+          <div class="filtros">
+            <select id="f-bloco"><option value="">Todos os blocos</option></select>
+            <select id="f-ambiente"><option value="">Todos os ambientes</option></select>
+            <select id="f-digitado">
+              <option value="">Digitado na UFSC: todos</option>
+              <option value="Sim">Digitado: Sim</option>
+              <option value="Não">Digitado: Não</option>
+            </select>
+            <input type="text" id="f-busca" placeholder="Buscar patrimônio, código ou descrição">
+          </div>
+          <div class="acoes-lote">
+            <label class="check-linha"><input type="checkbox" id="f-todos"> Selecionar todos os filtrados</label>
+            <span id="f-contagem" class="ajuda"></span>
+            <button class="btn-pequeno" id="btn-lote-sim">Marcar selecionados como digitados</button>
+            <button class="btn-pequeno claro" id="btn-lote-nao">Desmarcar</button>
+          </div>
+          <div id="lista-inventariados"></div>
+          <button id="btn-mais" class="btn-secundario" style="display:none">Mostrar mais</button>
+        </div>
+        <div id="sub-nc" style="display:none"><div id="lista-nc"></div></div>
+      </section>
+
+      <!-- Usuários -->
+      <section class="painel" id="painel-usuarios">
+        <div class="cartao">
+          <h3>Cadastrar usuário</h3>
+          <div class="grade-form">
+            <div><label for="u-nome">Nome</label><input type="text" id="u-nome"></div>
+            <div><label for="u-email">E-mail</label><input type="email" id="u-email"></div>
+            <div><label for="u-perfil">Perfil</label>
+              <select id="u-perfil"><option value="Inventariante">Inventariante (faz a leitura)</option><option value="Gestor">Gestor</option></select></div>
+          </div>
+          <label class="check-linha"><input type="checkbox" id="u-enviar" checked> Enviar a senha provisória por e-mail</label>
+          <button id="btn-criar-usuario" class="btn-primario auto">Cadastrar e gerar senha provisória</button>
+          <div id="u-status" class="status-msg"></div>
+        </div>
+        <div id="lista-usuarios"></div>
+      </section>
+
+      <!-- Ambientes -->
+      <section class="painel" id="painel-ambientes">
+        <div class="cartao">
+          <h3>Cadastrar novo ambiente</h3>
+          <div class="grade-form">
+            <div><label for="a-bloco">Bloco</label><select id="a-bloco"></select></div>
+            <div id="a-bloco-novo-wrap" style="display:none"><label for="a-bloco-novo">Nome do novo bloco</label><input type="text" id="a-bloco-novo"></div>
+            <div><label for="a-nome">Ambiente</label><input type="text" id="a-nome" placeholder="Ex: E205 - Laboratório"></div>
+          </div>
+          <button id="btn-add-ambiente" class="btn-primario auto">Cadastrar ambiente</button>
+          <div id="a-status" class="status-msg"></div>
+        </div>
+        <div id="lista-ambientes"></div>
+      </section>
+
+      <!-- Prazo e avisos -->
+      <section class="painel" id="painel-avisos">
+        <div class="cartao">
+          <h3>Prazo final do inventário</h3>
+          <div class="linha-form">
+            <input type="date" id="av-prazo">
+            <button id="btn-salvar-prazo" class="btn-pequeno">Salvar prazo</button>
+          </div>
+          <p class="ajuda">O prazo aparece para todos no app e é incluído nos e-mails de aviso.</p>
+        </div>
+        <div class="cartao">
+          <h3>Enviar aviso</h3>
+          <label for="av-assunto">Assunto</label>
+          <input type="text" id="av-assunto" placeholder="Ex: Faltam 7 dias para o fim do inventário">
+          <label for="av-mensagem">Mensagem</label>
+          <textarea id="av-mensagem" rows="4"></textarea>
+          <label>Destinatários</label>
+          <label class="check-linha"><input type="checkbox" id="av-todos"> Todos os usuários ativos</label>
+          <div id="av-destinatarios" class="lista-checks"></div>
+          <button id="btn-enviar-aviso" class="btn-primario auto">Enviar por e-mail</button>
+          <div id="av-status" class="status-msg"></div>
+        </div>
+        <div class="cartao"><h3>Avisos enviados</h3><div id="av-historico"></div></div>
+      </section>
+
+      <!-- Importar -->
+      <section class="painel" id="painel-importar">
+        <div class="cartao">
+          <h3>Importar relatórios de patrimônio</h3>
+          <p class="ajuda">Selecione um ou mais arquivos <b>.xls / .xlsx</b> (um por edificação/bloco). Os itens novos são acrescentados à base; patrimônios que já existem <b>não são alterados</b>, então dá para importar de novo sem perder o que já foi inventariado.</p>
+          <input type="file" id="imp-arquivos" accept=".xls,.xlsx" multiple>
+          <div id="imp-lista" class="lista-arquivos"></div>
+          <button id="btn-importar" class="btn-primario auto">Importar arquivo(s)</button>
+          <div id="imp-resultado"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ INVENTÁRIO ============ -->
+  <div id="tela-blocos" class="tela">
+    <div class="cabecalho">
+      <div class="cabecalho-linha">
+        <h1>Qual bloco?</h1>
+        <div class="barra-acoes">
+          <button class="btn-link" id="bl-voltar-gestao" style="display:none">Gestão</button>
+          <button class="btn-link" id="bl-trocar-senha">Senha</button>
+          <button class="btn-link" id="bl-sair">Sair</button>
+        </div>
+      </div>
+      <p class="subtitulo" id="bl-ola"></p>
+    </div>
+    <div class="conteudo estreito">
+      <div id="bl-avisos"></div>
+      <div id="lista-blocos" class="lista-clicavel"></div>
+    </div>
+  </div>
+
+  <div id="tela-ambientes" class="tela">
+    <div class="cabecalho">
+      <button class="btn-link btn-link-topo" id="am-voltar">◀ Trocar bloco</button>
+      <h1>Qual ambiente?</h1>
+      <p class="subtitulo" id="am-bloco-titulo"></p>
+    </div>
+    <div class="conteudo estreito"><div id="lista-ambientes-inv" class="lista-clicavel"></div></div>
+  </div>
+
+  <div id="tela-scanner" class="tela">
+    <div class="topo-scanner">
+      <button id="btn-trocar-local" class="btn-link">◀ Trocar ambiente</button>
+      <span id="local-atual-label"></span>
+      <span id="progresso-label"></span>
+    </div>
+    <div id="reader"></div>
+    <div id="reader-erro" class="alerta-caixa info" style="display:none;margin:12px">
+      <strong>A câmera não abriu</strong>
+      <span id="reader-erro-msg"></span>
+      <button id="btn-abrir-camera" class="btn-secundario" type="button">Tentar abrir a câmera</button>
+    </div>
+    <div id="reader-file" style="display:none"></div>
+    <div class="dica-scanner">Aponte a câmera para o código de barras do item</div>
+    <div class="entrada-manual">
+      <input type="text" id="input-codigo-manual" placeholder="Ou digite o código" inputmode="text">
+      <button id="btn-buscar-manual">Buscar</button>
+    </div>
+    <div class="conteudo estreito" style="flex:0">
+      <button id="btn-ler-foto" class="btn-secundario">Câmera não abriu? Ler o código por foto</button>
+      <input type="file" id="input-foto-codigo" accept="image/*" capture="environment" style="display:none">
+    </div>
+  </div>
+
+  <div id="tela-item" class="tela">
+    <div class="cabecalho"><h1 id="item-titulo">Item encontrado</h1></div>
+    <div class="conteudo estreito">
+      <div id="item-alertas"></div>
+      <div id="item-detalhes" class="card-item"></div>
+      <label for="input-foto">Foto do item (opcional)</label>
+      <input type="file" id="input-foto" accept="image/*" capture="environment">
+      <div id="preview-foto"></div>
+      <label for="input-observacao">Observação (opcional)</label>
+      <textarea id="input-observacao" rows="3"></textarea>
+      <button id="btn-confirmar-item" class="btn-primario">Confirmar que encontrei este item</button>
+      <button id="btn-nao-e-este" class="btn-secundario">Não é este item / ler outro código</button>
+    </div>
+  </div>
+
+  <div id="tela-escolha" class="tela">
+    <div class="cabecalho"><h1>Mais de um item com este código</h1><p class="subtitulo" id="escolha-codigo"></p></div>
+    <div class="conteudo estreito">
+      <p>Toque no item que está na sua frente:</p>
+      <div id="escolha-lista"></div>
+      <button id="btn-escolha-voltar" class="btn-secundario">Voltar e ler outro código</button>
+    </div>
+  </div>
+
+  <div id="tela-nao-catalogado" class="tela">
+    <div class="cabecalho"><h1>Código não encontrado na base</h1><p class="subtitulo" id="codigo-nao-encontrado"></p></div>
+    <div class="conteudo estreito">
+      <label for="input-foto-nc">Foto do item (opcional)</label>
+      <input type="file" id="input-foto-nc" accept="image/*" capture="environment">
+      <div id="preview-foto-nc"></div>
+      <label for="input-observacao-nc">Descrição / observação</label>
+      <textarea id="input-observacao-nc" rows="3" placeholder="Descreva o item..."></textarea>
+      <button id="btn-registrar-nc" class="btn-primario">Registrar item não catalogado</button>
+      <button id="btn-voltar-scanner-nc" class="btn-secundario">Voltar a ler</button>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div id="modal" class="modal" style="display:none">
+    <div class="modal-caixa"><div id="modal-corpo"></div><div id="modal-botoes"></div></div>
+  </div>
+  <div id="toast" class="toast"></div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  // ============================================================
+  //  ESTADO E UTILITÁRIOS
+  // ============================================================
+  var estado = {
+    token: '', usuario: null, contexto: null, nomeSetor: '', trocaForcada: false,
+    blocos: [], blocoAtual: '', ambienteAtual: '', itemAtual: null, codigoLido: '',
+    fotoBase64: '', fotoNC: '', scanner: null, scannerAtivo: false, processando: false,
+    inv: [], invFiltrados: [], invMostrar: 100, invSel: new Set(), nc: [],
+    ambGestao: [], usuariosGestao: [], andamentoCarregado: false
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function msgErro(e) {
+    var m = (e && e.message) ? e.message : String(e);
+    return m.replace(/^(Error|Exception):\s*/i, '');
+  }
+  function mostrarTela(id) {
+    document.querySelectorAll('.tela').forEach(function (t) { t.classList.remove('ativa'); });
+    $(id).classList.add('ativa');
+    window.scrollTo(0, 0);
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.classList.add('mostrar');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('mostrar'); }, 3200);
+  }
+  function setStatus(id, msg, tipo) {
+    var el = $(id);
+    el.className = 'status-msg' + (tipo ? ' ' + tipo : '');
+    el.textContent = msg || '';
+  }
+  function pct(a, b) { return b ? Math.round(a * 100 / b) : 0; }
+  function fmtPrazo(iso) { return iso ? iso.split('-').reverse().join('/') : ''; }
+
+  function guardarToken(t) { try { if (t) localStorage.setItem('inv_token', t); else localStorage.removeItem('inv_token'); } catch (e) { /* ignora */ } }
+  function lerToken() { try { return localStorage.getItem('inv_token') || ''; } catch (e) { return ''; } }
+
+  // Chamadas ao servidor.
+  // Modo normal: dentro do Apps Script (google.script.run). Modo externo: página hospedada fora do Google (a câmera só
+  // funciona assim) que chama o Apps Script por fetch; o endereço do setor vem em ?api=... e fica salvo no aparelho.
+  var MODO_EXTERNO = (typeof google === 'undefined' || !google.script || !google.script.run);
+  var API_URL = '';
+  function lerApiUrl() {
+    try {
+      var q = new URLSearchParams(location.search).get('api');
+      if (q) { localStorage.setItem('inv_api', q); return q; }
+      return localStorage.getItem('inv_api') || '';
+    } catch (e) { return ''; }
+  }
+  function api(nome) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (MODO_EXTERNO) {
+      return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: nome, args: args }) })
+        .catch(function () { throw new Error('Sem conexão com o servidor. Confira a internet e o endereço do setor.'); })
+        .then(function (r) { return r.json().catch(function () { throw new Error('O servidor não respondeu como esperado. Confira o endereço do setor (deve terminar em /exec).'); }); })
+        .then(function (j) { if (!j.ok) throw new Error(j.erro); return j.dados; });
+    }
+    return new Promise(function (resolve, reject) {
+      var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+      r[nome].apply(r, args);
+    });
+  }
+  function apiA(nome) {
+    var args = [nome, estado.token].concat(Array.prototype.slice.call(arguments, 1));
+    return api.apply(null, args).catch(function (e) {
+      var m = msgErro(e);
+      if (m.indexOf('SESSAO_EXPIRADA') >= 0) { sair(); throw new Error('Sessão expirada. Entre novamente.'); }
+      if (m.indexOf('TROCAR_SENHA') >= 0) { abrirTrocaSenha(true); throw new Error('Troque a senha provisória para continuar.'); }
+      throw new Error(m);
+    });
+  }
+
+  // Modal genérico
+  function abrirModal(html, botoes) {
+    $('modal-corpo').innerHTML = html;
+    var cont = $('modal-botoes');
+    cont.innerHTML = '';
+    (botoes || [{ texto: 'Fechar' }]).forEach(function (b) {
+      var btn = document.createElement('button');
+      btn.className = b.classe || 'btn-primario';
+      btn.textContent = b.texto;
+      btn.addEventListener('click', function () { fecharModal(); if (b.acao) b.acao(); });
+      cont.appendChild(btn);
+    });
+    $('modal').style.display = 'flex';
+  }
+  function fecharModal() { $('modal').style.display = 'none'; }
+  function confirmar(mensagem, textoOk) {
+    return new Promise(function (resolve) {
+      abrirModal('<p>' + esc(mensagem) + '</p>', [
+        { texto: textoOk || 'Confirmar', acao: function () { resolve(true); } },
+        { texto: 'Cancelar', classe: 'btn-secundario', acao: function () { resolve(false); } }
+      ]);
+    });
+  }
+
+  // ============================================================
+  //  INICIALIZAÇÃO E SESSÃO
+  // ============================================================
+  window.addEventListener('DOMContentLoaded', iniciar);
+
+  // Endereço do setor (só no modo externo)
+  $('btn-salvar-api').addEventListener('click', function () {
+    var u = $('input-api').value.trim();
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^\/\s]+\/exec$/.test(u)) { toast('Cole o link completo do app, terminando em /exec.'); return; }
+    try { localStorage.setItem('inv_api', u); } catch (e) { /* ignora */ }
+    API_URL = u; mostrarTela('tela-carregando'); iniciar();
+  });
+  $('link-trocar-api').addEventListener('click', function (e) {
+    e.preventDefault();
+    try { localStorage.removeItem('inv_api'); localStorage.removeItem('inv_token'); } catch (x) { /* ignora */ }
+    location.href = location.pathname;
+  });
+  if (!MODO_EXTERNO) { $('link-trocar-api').style.display = 'none'; }
+
+  function iniciar() {
+    if (MODO_EXTERNO) {
+      API_URL = lerApiUrl();
+      if (!API_URL) { mostrarTela('tela-api'); return; }
+    }
+    api('getStatus').then(function (st) {
+      estado.nomeSetor = st.nomeSetor;
+      if (!st.configurado) { mostrarTela('tela-ativacao'); return; }
+      $('login-setor').textContent = st.nomeSetor || '';
+      var t = lerToken();
+      if (!t) { mostrarTela('tela-login'); return; }
+      estado.token = t;
+      api('sessao', t).then(aplicarSessao).catch(function () {
+        estado.token = ''; guardarToken('');
+        mostrarTela('tela-login');
+      });
+    }).catch(function (e) {
+      document.querySelector('#tela-carregando p').textContent = 'Não consegui carregar o app: ' + msgErro(e);
+    });
+  }
+
+  function aplicarSessao(s) {
+    estado.usuario = s.usuario;
+    estado.contexto = s.contexto;
+    if (s.usuario.trocarSenha) abrirTrocaSenha(true); else entrarNoApp();
+  }
+  function entrarNoApp() {
+    if (estado.usuario.perfil === 'Gestor') abrirGestao(); else abrirBlocos();
+  }
+  function sair() {
+    pararScanner();
+    estado.token = ''; estado.usuario = null;
+    guardarToken('');
+    $('lg-senha').value = '';
+    setStatus('lg-status', '');
+    $('login-setor').textContent = estado.nomeSetor || '';
+    mostrarTela('tela-login');
+  }
+
+  // --- Ativação (primeiro acesso) ---
+  $('btn-ativar').addEventListener('click', function () {
+    var s1 = $('at-senha').value, s2 = $('at-senha2').value;
+    if (s1 !== s2) { setStatus('at-status', 'As senhas não conferem.', 'erro'); return; }
+    var btn = $('btn-ativar'); btn.disabled = true; setStatus('at-status', 'Configurando...');
+    api('configurarInicial', $('at-codigo').value, $('at-setor').value, $('at-nome').value, $('at-email').value, s1)
+      .then(function (r) {
+        btn.disabled = false;
+        estado.token = r.token; guardarToken(r.token); estado.nomeSetor = r.contexto.nomeSetor;
+        aplicarSessao(r);
+        toast('App configurado! Agora cadastre os usuários e importe as planilhas.');
+        ativarAba('importar');
+      }).catch(function (e) { btn.disabled = false; setStatus('at-status', msgErro(e), 'erro'); });
+  });
+
+  // --- Login ---
+  function fazerLogin() {
+    var btn = $('btn-entrar'); btn.disabled = true; setStatus('lg-status', 'Entrando...');
+    api('login', $('lg-email').value, $('lg-senha').value).then(function (r) {
+      btn.disabled = false; setStatus('lg-status', '');
+      estado.token = r.token; guardarToken(r.token);
+      $('lg-senha').value = '';
+      aplicarSessao(r);
+    }).catch(function (e) { btn.disabled = false; setStatus('lg-status', msgErro(e), 'erro'); });
+  }
+  $('btn-entrar').addEventListener('click', fazerLogin);
+  $('lg-senha').addEventListener('keydown', function (e) { if (e.key === 'Enter') fazerLogin(); });
+
+  // --- Trocar senha ---
+  function abrirTrocaSenha(forcada) {
+    estado.trocaForcada = !!forcada;
+    $('sn-titulo').textContent = forcada ? 'Crie sua senha' : 'Trocar senha';
+    $('sn-sub').textContent = forcada ? 'Sua senha atual é provisória. Defina uma nova para continuar.' : '';
+    $('btn-cancelar-senha').style.display = forcada ? 'none' : 'block';
+    ['sn-atual', 'sn-nova', 'sn-nova2'].forEach(function (i) { $(i).value = ''; });
+    setStatus('sn-status', '');
+    mostrarTela('tela-senha');
+  }
+  $('btn-salvar-senha').addEventListener('click', function () {
+    if ($('sn-nova').value !== $('sn-nova2').value) { setStatus('sn-status', 'As senhas novas não conferem.', 'erro'); return; }
+    var btn = $('btn-salvar-senha'); btn.disabled = true;
+    api('trocarSenha', estado.token, $('sn-atual').value, $('sn-nova').value).then(function (r) {
+      btn.disabled = false;
+      estado.usuario = r.usuario; estado.contexto = r.contexto;
+      toast('Senha alterada.');
+      entrarNoApp();
+    }).catch(function (e) { btn.disabled = false; setStatus('sn-status', msgErro(e), 'erro'); });
+  });
+  $('btn-cancelar-senha').addEventListener('click', entrarNoApp);
+
+  // ============================================================
+  //  GESTÃO — NAVEGAÇÃO
+  // ============================================================
+  function abrirGestao() {
+    $('gs-setor').textContent = (estado.contexto && estado.contexto.nomeSetor) || '';
+    mostrarTela('tela-gestao');
+    ativarAba(document.querySelector('#gs-abas .aba.ativa').getAttribute('data-aba'));
+  }
+  $('gs-sair').addEventListener('click', sair);
+  $('gs-trocar-senha').addEventListener('click', function () { abrirTrocaSenha(false); });
+  $('gs-ir-inventario').addEventListener('click', abrirBlocos);
+
+  $('gs-abas').addEventListener('click', function (e) {
+    var b = e.target.closest('.aba');
+    if (b) ativarAba(b.getAttribute('data-aba'));
+  });
+
+  function ativarAba(nome) {
+    document.querySelectorAll('#gs-abas .aba').forEach(function (b) { b.classList.toggle('ativa', b.getAttribute('data-aba') === nome); });
+    document.querySelectorAll('.painel').forEach(function (p) { p.classList.toggle('ativo', p.id === 'painel-' + nome); });
+    var carregar = { andamento: carregarAndamento, inventariados: carregarInventariados, usuarios: carregarUsuarios,
+                     ambientes: carregarAmbientesGestao, avisos: carregarAvisos }[nome];
+    if (carregar) carregar();
+  }
+
+  // ============================================================
+  //  GESTÃO — ANDAMENTO
+  // ============================================================
+  function carregarAndamento() {
+    $('andamento-corpo').innerHTML = '<div class="carregando-txt">Carregando...</div>';
+    apiA('getAndamento').then(renderAndamento).catch(function (e) {
+      $('andamento-corpo').innerHTML = '<div class="status-msg erro">' + esc(msgErro(e)) + '</div>';
+    });
+  }
+
+  function barraHtml(a, b) { var p = pct(a, b); return '<div class="barra' + (p === 100 ? ' ok' : '') + '"><i style="width:' + p + '%"></i></div>'; }
+
+  function renderAndamento(a) {
+    var h = '';
+    if (a.prazo) {
+      var dias = Math.ceil((new Date(a.prazo + 'T23:59:59') - new Date()) / 86400000);
+      var cls = dias < 0 ? 'vencido' : (dias <= 7 ? 'alerta' : '');
+      var txt = dias < 0 ? 'Prazo encerrado em ' + fmtPrazo(a.prazo) + ' (há ' + (-dias) + ' dia(s))'
+              : dias === 0 ? 'O prazo termina hoje (' + fmtPrazo(a.prazo) + ')'
+              : 'Prazo final: ' + fmtPrazo(a.prazo) + ' — faltam ' + dias + ' dia(s)';
+      h += '<div class="prazo-faixa ' + cls + '">' + esc(txt) + '</div>';
+    }
+    h += '<div class="resumo">' +
+      '<div class="num-card"><div class="r">Itens na base</div><div class="n">' + a.total + '</div></div>' +
+      '<div class="num-card"><div class="r">Encontrados</div><div class="n">' + a.encontrados + ' <small>(' + pct(a.encontrados, a.total) + '%)</small></div></div>' +
+      '<div class="num-card"><div class="r">Faltam</div><div class="n">' + (a.total - a.encontrados) + '</div></div>' +
+      '<div class="num-card"><div class="r">Digitados na UFSC</div><div class="n">' + a.digitados + '</div><div class="ajuda">' + (a.encontrados - a.digitados) + ' a digitar</div></div>' +
+      '<div class="num-card"><div class="r">Não catalogados</div><div class="n">' + a.naoCatalogados + '</div></div>' +
+      '</div>';
+    h += '<div class="cartao">' + barraHtml(a.encontrados, a.total) + '</div>';
+
+    if (!a.blocos.length) h += '<div class="cartao">Nenhum dado ainda. Vá em <b>Importar</b> para carregar as planilhas.</div>';
+    a.blocos.forEach(function (b) {
+      h += '<details class="bloco"><summary><span class="bloco-nome">' + esc(b.bloco) + '</span>' +
+           '<span class="bloco-num">' + b.encontrados + '/' + b.total + ' · ' + pct(b.encontrados, b.total) + '%</span>' + barraHtml(b.encontrados, b.total) + '</summary>' +
+           '<div class="rolagem"><table><thead><tr><th>Ambiente</th><th>Encontrados</th><th>Digitados</th><th>Última leitura</th></tr></thead><tbody>';
+      b.ambientes.forEach(function (x) {
+        h += '<tr><td>' + esc(x.ambiente) + (x.ativo ? '' : ' <span class="tag">inativo</span>') + '</td>' +
+             '<td>' + x.encontrados + '/' + x.total + (x.total ? ' <span class="tag ' + (x.encontrados === x.total ? 'ok' : '') + '">' + pct(x.encontrados, x.total) + '%</span>' : '') + '</td>' +
+             '<td>' + x.digitados + '</td><td>' + esc(x.ultima || '—') + '</td></tr>';
+      });
+      h += '</tbody></table></div></details>';
+    });
+
+    h += '<div class="cartao"><h3>Por usuário</h3>';
+    if (!a.usuarios.length) h += '<p class="ajuda">Ninguém confirmou itens ainda.</p>';
+    else {
+      h += '<div class="rolagem"><table><thead><tr><th>Usuário</th><th>Confirmações</th><th>Última</th></tr></thead><tbody>';
+      a.usuarios.forEach(function (u) { h += '<tr><td>' + esc(u.nome) + '</td><td>' + u.confirmacoes + '</td><td>' + esc(u.ultima) + '</td></tr>'; });
+      h += '</tbody></table></div>';
+    }
+    h += '</div>';
+    $('andamento-corpo').innerHTML = h;
+  }
+
+  // ============================================================
+  //  GESTÃO — INVENTARIADOS / DIGITADO NA UFSC
+  // ============================================================
+  document.querySelectorAll('.seg').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.seg').forEach(function (x) { x.classList.toggle('ativo', x === b); });
+      var sub = b.getAttribute('data-sub');
+      $('sub-inv').style.display = sub === 'inv' ? 'block' : 'none';
+      $('sub-nc').style.display = sub === 'nc' ? 'block' : 'none';
+      if (sub === 'nc') carregarNaoCatalogados();
+    });
+  });
+
+  function carregarInventariados() {
+    $('lista-inventariados').innerHTML = '<div class="carregando-txt">Carregando...</div>';
+    apiA('listarInventariados').then(function (lista) {
+      estado.inv = lista; estado.invSel = new Set();
+      popularFiltros(); aplicarFiltros();
+    }).catch(function (e) { $('lista-inventariados').innerHTML = '<div class="status-msg erro">' + esc(msgErro(e)) + '</div>'; });
+  }
+
+  function popularFiltros() {
+    var blocos = {};
+    estado.inv.forEach(function (i) { var b = i.blocoEncontrado || i.bloco; blocos[b] = true; });
+    var sel = $('f-bloco'), atual = sel.value;
+    sel.innerHTML = '<option value="">Todos os blocos</option>' + Object.keys(blocos).sort().map(function (b) { return '<option>' + esc(b) + '</option>'; }).join('');
+    sel.value = blocos[atual] ? atual : '';
+    popularAmbientesFiltro();
+  }
+  function popularAmbientesFiltro() {
+    var b = $('f-bloco').value, amb = {};
+    estado.inv.forEach(function (i) { if (!b || (i.blocoEncontrado || i.bloco) === b) amb[i.ambienteEncontrado || i.ambiente] = true; });
+    var sel = $('f-ambiente'), atual = sel.value;
+    sel.innerHTML = '<option value="">Todos os ambientes</option>' + Object.keys(amb).sort().map(function (a) { return '<option>' + esc(a) + '</option>'; }).join('');
+    sel.value = amb[atual] ? atual : '';
+  }
+
+  function aplicarFiltros() {
+    var b = $('f-bloco').value, a = $('f-ambiente').value, d = $('f-digitado').value, q = $('f-busca').value.trim().toLowerCase();
+    estado.invFiltrados = estado.inv.filter(function (i) {
+      if (b && (i.blocoEncontrado || i.bloco) !== b) return false;
+      if (a && (i.ambienteEncontrado || i.ambiente) !== a) return false;
+      if (d && i.digitado !== d) return false;
+      if (q && (i.patrimonio + ' ' + i.codBarras + ' ' + i.numControle + ' ' + i.descricao).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    estado.invMostrar = 100;
+    renderInventariados();
+  }
+
+  function renderInventariados() {
+    var f = estado.invFiltrados;
+    var dig = f.filter(function (i) { return i.digitado === 'Sim'; }).length;
+    $('f-contagem').textContent = f.length + ' item(ns) · ' + dig + ' digitado(s) · ' + estado.invSel.size + ' selecionado(s)';
+    if (!f.length) { $('lista-inventariados').innerHTML = '<div class="cartao">Nenhum item inventariado com esses filtros.</div>'; $('btn-mais').style.display = 'none'; return; }
+    var h = '';
+    f.slice(0, estado.invMostrar).forEach(function (i) {
+      var local = (i.blocoEncontrado || i.bloco) + ' · ' + (i.ambienteEncontrado || i.ambiente);
+      h += '<div class="item-linha">' +
+        '<input type="checkbox" class="sel" data-pat="' + esc(i.patrimonio) + '"' + (estado.invSel.has(i.patrimonio) ? ' checked' : '') + '>' +
+        '<div class="desc">' + esc(i.descricao || '(sem descrição)') + '</div>' +
+        '<div class="acao"><select class="dig" data-pat="' + esc(i.patrimonio) + '"><option' + (i.digitado === 'Sim' ? ' selected' : '') + '>Sim</option><option' + (i.digitado !== 'Sim' ? ' selected' : '') + '>Não</option></select>' +
+        '<div class="ajuda">Digitado na UFSC</div></div>' +
+        '<div class="meta">' + (/^(CTRL|COD)-/.test(i.patrimonio) ? 'Sem patrimônio · Controle <b>' + esc(i.numControle || i.patrimonio) + '</b>' : 'Patrimônio <b>' + esc(i.patrimonio) + '</b>') + (i.codBarras ? ' · Cód. ' + esc(i.codBarras) : '') + '</div>' +
+        '<div class="meta">' + esc(local) + (i.mudouAmbiente ? ' <span class="tag aviso">cadastrado em ' + esc(i.ambiente) + '</span>' : '') + '</div>' +
+        '<div class="meta">Por ' + esc(i.verificadoPor) + ' em ' + esc(i.data) +
+          i.fotos.map(function (u, k) { return ' · <a href="' + esc(u) + '" target="_blank" rel="noopener">foto' + (i.fotos.length > 1 ? ' ' + (k + 1) : '') + '</a>'; }).join('') +
+          (i.digitado === 'Sim' && i.digitadoPor ? ' · digitado por ' + esc(i.digitadoPor) + ' em ' + esc(i.digitadoEm) : '') + '</div>' +
+        (i.observacao ? '<div class="meta">Obs.: ' + esc(i.observacao) + '</div>' : '') +
+        '</div>';
+    });
+    $('lista-inventariados').innerHTML = h;
+    $('btn-mais').style.display = f.length > estado.invMostrar ? 'block' : 'none';
+  }
+
+  ['f-bloco'].forEach(function (id) { $(id).addEventListener('change', function () { popularAmbientesFiltro(); aplicarFiltros(); }); });
+  ['f-ambiente', 'f-digitado'].forEach(function (id) { $(id).addEventListener('change', aplicarFiltros); });
+  $('f-busca').addEventListener('input', aplicarFiltros);
+  $('btn-mais').addEventListener('click', function () { estado.invMostrar += 100; renderInventariados(); });
+  $('f-todos').addEventListener('change', function () {
+    estado.invFiltrados.forEach(function (i) { if ($('f-todos').checked) estado.invSel.add(i.patrimonio); else estado.invSel.delete(i.patrimonio); });
+    renderInventariados();
+  });
+  $('lista-inventariados').addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.classList.contains('sel')) {
+      var p = t.getAttribute('data-pat');
+      if (t.checked) estado.invSel.add(p); else estado.invSel.delete(p);
+      $('f-contagem').textContent = $('f-contagem').textContent.replace(/\d+ selecionado/, estado.invSel.size + ' selecionado');
+    } else if (t.classList.contains('dig')) {
+      marcarDigitados([t.getAttribute('data-pat')], t.value === 'Sim');
+    }
+  });
+  $('btn-lote-sim').addEventListener('click', function () { loteDigitado(true); });
+  $('btn-lote-nao').addEventListener('click', function () { loteDigitado(false); });
+
+  function loteDigitado(valor) {
+    var pats = Array.from(estado.invSel);
+    if (!pats.length) { toast('Selecione ao menos um item.'); return; }
+    marcarDigitados(pats, valor);
+  }
+  function marcarDigitados(pats, valor) {
+    apiA('marcarDigitado', pats, valor).then(function (n) {
+      var set = new Set(pats);
+      estado.inv.forEach(function (i) {
+        if (set.has(i.patrimonio)) { i.digitado = valor ? 'Sim' : 'Não'; i.digitadoPor = valor ? estado.usuario.nome : ''; i.digitadoEm = valor ? 'agora' : ''; }
+      });
+      if (pats.length > 1) { estado.invSel = new Set(); $('f-todos').checked = false; }
+      toast(n + ' item(ns) atualizado(s).');
+      aplicarFiltrosMantendoPagina();
+    }).catch(function (e) { toast(msgErro(e)); renderInventariados(); });
+  }
+  function aplicarFiltrosMantendoPagina() {
+    var mostrar = estado.invMostrar;
+    aplicarFiltros(); estado.invMostrar = mostrar; renderInventariados();
+  }
+
+  function carregarNaoCatalogados() {
+    $('lista-nc').innerHTML = '<div class="carregando-txt">Carregando...</div>';
+    apiA('listarNaoCatalogados').then(function (l) {
+      if (!l.length) { $('lista-nc').innerHTML = '<div class="cartao">Nenhum item não catalogado registrado.</div>'; return; }
+      var h = '<div class="cartao rolagem"><table><thead><tr><th>Código lido</th><th>Local</th><th>Quem / quando</th><th>Observação</th></tr></thead><tbody>';
+      l.forEach(function (x) {
+        h += '<tr><td><b>' + esc(x.codigo) + '</b></td><td>' + esc(x.bloco) + '<br>' + esc(x.ambiente) + '</td><td>' + esc(x.usuario) + '<br>' + esc(x.data) + '</td><td>' +
+             esc(x.observacao) + x.fotos.map(function (u) { return ' <a href="' + esc(u) + '" target="_blank" rel="noopener">foto</a>'; }).join('') + '</td></tr>';
+      });
+      $('lista-nc').innerHTML = h + '</tbody></table></div>';
+    }).catch(function (e) { $('lista-nc').innerHTML = '<div class="status-msg erro">' + esc(msgErro(e)) + '</div>'; });
+  }
+
+  // ============================================================
+  //  GESTÃO — USUÁRIOS
+  // ============================================================
+  function carregarUsuarios() {
+    apiA('listarUsuarios').then(function (l) { estado.usuariosGestao = l; renderUsuarios(); })
+      .catch(function (e) { $('lista-usuarios').innerHTML = '<div class="status-msg erro">' + esc(msgErro(e)) + '</div>'; });
+  }
+  function renderUsuarios() {
+    var h = '<div class="cartao rolagem"><table><thead><tr><th>Nome</th><th>Perfil</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead><tbody>';
+    estado.usuariosGestao.forEach(function (u) {
+      h += '<tr><td><b>' + esc(u.nome) + '</b><br><span class="ajuda">' + esc(u.email) + '</span></td><td>' + esc(u.perfil) + '</td><td>' +
+           (u.ativo ? '<span class="tag ok">ativo</span>' : '<span class="tag erro">desativado</span>') +
+           (u.trocarSenha ? ' <span class="tag aviso">senha provisória</span>' : '') + '</td><td>' + esc(u.ultimoAcesso || '—') + '</td><td>' +
+           '<button class="btn-pequeno claro" data-acao="reset" data-email="' + esc(u.email) + '">Nova senha</button> ' +
+           '<button class="btn-pequeno ' + (u.ativo ? 'perigo' : 'claro') + '" data-acao="' + (u.ativo ? 'desativar' : 'ativar') + '" data-email="' + esc(u.email) + '">' + (u.ativo ? 'Desativar' : 'Ativar') + '</button></td></tr>';
+    });
+    $('lista-usuarios').innerHTML = h + '</tbody></table></div>';
+  }
+  function mostrarCredenciais(r, titulo) {
+    abrirModal('<h3>' + esc(titulo) + '</h3><p>Repasse estes dados para <b>' + esc(r.nome) + '</b>. A senha só aparece agora; no primeiro acesso a pessoa será obrigada a criar outra.</p>' +
+      '<div class="credencial"><b>E-mail</b>' + esc(r.email) + '</div>' +
+      '<div class="credencial"><b>Senha provisória</b><code>' + esc(r.senhaProvisoria) + '</code></div>' +
+      (r.urlApp ? '<div class="credencial"><b>Endereço do app</b>' + esc(r.urlApp) + '</div>' : '') +
+      (r.emailEnviado ? '<p class="status-msg sucesso">E-mail enviado para ' + esc(r.email) + '.</p>' : '') +
+      (r.erroEmail ? '<p class="status-msg erro">Não consegui enviar o e-mail: ' + esc(r.erroEmail) + '</p>' : ''));
+  }
+  $('btn-criar-usuario').addEventListener('click', function () {
+    var btn = $('btn-criar-usuario'); btn.disabled = true; setStatus('u-status', 'Cadastrando...');
+    apiA('criarUsuario', $('u-nome').value, $('u-email').value, $('u-perfil').value, $('u-enviar').checked).then(function (r) {
+      btn.disabled = false; setStatus('u-status', '');
+      $('u-nome').value = ''; $('u-email').value = '';
+      mostrarCredenciais(r, 'Usuário cadastrado');
+      carregarUsuarios();
+    }).catch(function (e) { btn.disabled = false; setStatus('u-status', msgErro(e), 'erro'); });
+  });
+  $('lista-usuarios').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-acao]');
+    if (!b) return;
+    var email = b.getAttribute('data-email'), acao = b.getAttribute('data-acao');
+    if (acao === 'reset') {
+      confirmar('Gerar uma nova senha provisória para ' + email + '? A senha atual deixa de funcionar.', 'Gerar nova senha').then(function (ok) {
+        if (!ok) return;
+        apiA('redefinirSenha', email, true).then(function (r) { mostrarCredenciais(r, 'Nova senha gerada'); carregarUsuarios(); }).catch(function (er) { toast(msgErro(er)); });
+      });
+    } else {
+      apiA('alterarUsuarioAtivo', email, acao === 'ativar').then(function () { toast(acao === 'ativar' ? 'Usuário ativado.' : 'Usuário desativado.'); carregarUsuarios(); })
+        .catch(function (er) { toast(msgErro(er)); });
+    }
+  });
+
+  // ============================================================
+  //  GESTÃO — AMBIENTES
+  // ============================================================
+  function carregarAmbientesGestao() {
+    apiA('listarAmbientes').then(function (l) { estado.ambGestao = l; renderAmbientesGestao(); })
+      .catch(function (e) { $('lista-ambientes').innerHTML = '<div class="status-msg erro">' + esc(msgErro(e)) + '</div>'; });
+  }
+  function renderAmbientesGestao() {
+    var blocos = {};
+    estado.ambGestao.forEach(function (a) { (blocos[a.bloco] = blocos[a.bloco] || []).push(a); });
+    var sel = $('a-bloco'), atual = sel.value;
+    sel.innerHTML = Object.keys(blocos).sort().map(function (b) { return '<option>' + esc(b) + '</option>'; }).join('') + '<option value="__novo__">+ Novo bloco...</option>';
+    if (atual && (blocos[atual] || atual === '__novo__')) sel.value = atual;
+    $('a-bloco-novo-wrap').style.display = sel.value === '__novo__' ? 'block' : 'none';
+
+    var h = '';
+    Object.keys(blocos).sort().forEach(function (b) {
+      h += '<div class="cartao"><h3>' + esc(b) + '</h3><div class="rolagem"><table><thead><tr><th>Ambiente</th><th>Itens</th><th>Situação</th><th></th></tr></thead><tbody>';
+      blocos[b].forEach(function (a) {
+        h += '<tr><td>' + esc(a.ambiente) + '</td><td>' + a.encontrados + '/' + a.total + '</td><td>' + (a.ativo ? '<span class="tag ok">disponível</span>' : '<span class="tag">oculto</span>') + '</td><td>' +
+             '<button class="btn-pequeno claro" data-bloco="' + esc(a.bloco) + '" data-amb="' + esc(a.ambiente) + '" data-ativo="' + (a.ativo ? '0' : '1') + '">' + (a.ativo ? 'Ocultar' : 'Disponibilizar') + '</button></td></tr>';
+      });
+      h += '</tbody></table></div></div>';
+    });
+    $('lista-ambientes').innerHTML = h || '<div class="cartao">Nenhum ambiente ainda. Importe as planilhas ou cadastre um novo bloco acima.</div>';
+  }
+  $('a-bloco').addEventListener('change', function () { $('a-bloco-novo-wrap').style.display = $('a-bloco').value === '__novo__' ? 'block' : 'none'; });
+  $('btn-add-ambiente').addEventListener('click', function () {
+    var bloco = $('a-bloco').value === '__novo__' ? $('a-bloco-novo').value : $('a-bloco').value;
+    var btn = $('btn-add-ambiente'); btn.disabled = true;
+    apiA('adicionarAmbiente', bloco, $('a-nome').value).then(function () {
+      btn.disabled = false; $('a-nome').value = ''; $('a-bloco-novo').value = '';
+      setStatus('a-status', 'Ambiente cadastrado.', 'sucesso'); carregarAmbientesGestao();
+    }).catch(function (e) { btn.disabled = false; setStatus('a-status', msgErro(e), 'erro'); });
+  });
+  $('lista-ambientes').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-amb]');
+    if (!b) return;
+    apiA('alterarAmbienteAtivo', b.getAttribute('data-bloco'), b.getAttribute('data-amb'), b.getAttribute('data-ativo') === '1')
+      .then(carregarAmbientesGestao).catch(function (er) { toast(msgErro(er)); });
+  });
+
+  // ============================================================
+  //  GESTÃO — PRAZO E AVISOS
+  // ============================================================
+  function carregarAvisos() {
+    $('av-prazo').value = (estado.contexto && estado.contexto.prazo) || '';
+    Promise.all([apiA('listarUsuarios'), apiA('listarAvisos')]).then(function (r) {
+      estado.usuariosGestao = r[0];
+      var ativos = r[0].filter(function (u) { return u.ativo; });
+      $('av-destinatarios').innerHTML = ativos.map(function (u) {
+        return '<label class="check-linha"><input type="checkbox" class="dest" value="' + esc(u.email) + '"> ' + esc(u.nome) + ' <span class="ajuda">' + esc(u.email) + '</span></label>';
+      }).join('') || '<p class="ajuda">Nenhum usuário ativo.</p>';
+      $('av-todos').checked = false;
+      $('av-historico').innerHTML = r[1].length ? r[1].map(function (a) {
+        return '<div class="item-linha" style="grid-template-columns:1fr"><div class="desc">' + esc(a.assunto) + '</div><div class="meta" style="grid-column:1">' + esc(a.data) + ' · ' + esc(a.autor) + '</div><div style="white-space:pre-wrap">' + esc(a.mensagem) + '</div></div>';
+      }).join('') : '<p class="ajuda">Nenhum aviso enviado ainda.</p>';
+    }).catch(function (e) { toast(msgErro(e)); });
+  }
+  $('av-todos').addEventListener('change', function () {
+    document.querySelectorAll('.dest').forEach(function (c) { c.checked = $('av-todos').checked; });
+  });
+  $('btn-salvar-prazo').addEventListener('click', function () {
+    apiA('definirPrazo', $('av-prazo').value).then(function (p) {
+      estado.contexto.prazo = p; toast(p ? 'Prazo salvo: ' + fmtPrazo(p) : 'Prazo removido.');
+    }).catch(function (e) { toast(msgErro(e)); });
+  });
+  $('btn-enviar-aviso').addEventListener('click', function () {
+    var emails = Array.from(document.querySelectorAll('.dest:checked')).map(function (c) { return c.value; });
+    var btn = $('btn-enviar-aviso'); btn.disabled = true; setStatus('av-status', 'Enviando...');
+    apiA('enviarAviso', $('av-assunto').value, $('av-mensagem').value, emails).then(function (r) {
+      btn.disabled = false;
+      setStatus('av-status', r.enviados + ' e-mail(s) enviado(s).' + (r.falhas.length ? ' Falhas: ' + r.falhas.join('; ') : ''), r.falhas.length ? 'erro' : 'sucesso');
+      $('av-assunto').value = ''; $('av-mensagem').value = '';
+      carregarAvisos();
+    }).catch(function (e) { btn.disabled = false; setStatus('av-status', msgErro(e), 'erro'); });
+  });
+
+  // ============================================================
+  //  GESTÃO — IMPORTAR
+  // ============================================================
+  function tamanho(b) { return b < 1048576 ? Math.round(b / 1024) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
+  $('imp-arquivos').addEventListener('change', function (e) {
+    $('imp-lista').innerHTML = Array.from(e.target.files).map(function (f) {
+      return '<div class="arquivo-item"><span>' + esc(f.name) + '</span><span>' + tamanho(f.size) + '</span></div>';
+    }).join('');
+  });
+  function lerArquivoBase64(f) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function (e) { resolve({ nome: f.name, base64: String(e.target.result).split(',')[1], mimeType: f.type || 'application/vnd.ms-excel' }); };
+      r.onerror = function () { reject(new Error('Não consegui ler ' + f.name)); };
+      r.readAsDataURL(f);
+    });
+  }
+  $('btn-importar').addEventListener('click', function () {
+    var arqs = Array.from($('imp-arquivos').files);
+    if (!arqs.length) { toast('Selecione ao menos um arquivo.'); return; }
+    var btn = $('btn-importar'); btn.disabled = true;
+    var saida = $('imp-resultado'); saida.innerHTML = '';
+    var totais = { novos: 0, ja: 0, amb: 0 };
+    var seq = Promise.resolve();
+    arqs.forEach(function (f) {
+      seq = seq.then(function () {
+        var linha = document.createElement('p'); linha.textContent = 'Importando ' + f.name + '...'; saida.appendChild(linha);
+        return lerArquivoBase64(f).then(function (a) { return apiA('importarArquivo', a); }).then(function (r) {
+          totais.novos += r.itensNovos; totais.ja += r.itensJaExistiam; totais.amb += r.ambientesNovos;
+          linha.className = 'res-ok';
+          linha.textContent = '✔ ' + r.arquivo + ' (' + r.bloco + '): ' + r.itensNovos + ' itens novos, ' + r.itensJaExistiam + ' já existiam, ' + r.ambientesNovos + ' ambiente(s) novo(s)' + (r.semPatrimonio ? ' · ' + r.semPatrimonio + ' sem nº de patrimônio (identificados pelo nº de controle)' : '') + '.';
+        }).catch(function (e) { linha.className = 'res-erro'; linha.textContent = '✖ ' + f.name + ': ' + msgErro(e); });
+      });
+    });
+    seq.then(function () {
+      btn.disabled = false;
+      var t = document.createElement('p'); t.innerHTML = '<b>Total:</b> ' + totais.novos + ' itens novos · ' + totais.ja + ' já existiam · ' + totais.amb + ' ambiente(s) novo(s).'; saida.appendChild(t);
+      $('imp-arquivos').value = ''; $('imp-lista').innerHTML = '';
+    });
+  });
+
+  // ============================================================
+  //  INVENTÁRIO — BLOCOS E AMBIENTES
+  // ============================================================
+  function abrirBlocos() {
+    pararScanner();
+    $('bl-ola').textContent = 'Olá, ' + estado.usuario.nome + (estado.contexto.nomeSetor ? ' · ' + estado.contexto.nomeSetor : '');
+    $('bl-voltar-gestao').style.display = estado.usuario.perfil === 'Gestor' ? 'inline-block' : 'none';
+    renderAvisosHome();
+    $('lista-blocos').innerHTML = '<div class="linha">Carregando...</div>';
+    mostrarTela('tela-blocos');
+    apiA('getBlocos').then(function (b) {
+      estado.blocos = b;
+      if (!b.length) { $('lista-blocos').innerHTML = '<div class="linha">Nenhum ambiente disponível. Peça à gestão para importar as planilhas.</div>'; return; }
+      $('lista-blocos').innerHTML = b.map(function (x, i) {
+        var t = 0, e = 0; x.ambientes.forEach(function (a) { t += a.total; e += a.encontrados; });
+        return '<div class="linha" data-i="' + i + '"><span>' + esc(x.bloco) + '</span><span class="contagem">' + e + '/' + t + ' itens</span><span class="seta">›</span></div>';
+      }).join('');
+    }).catch(function (e) { $('lista-blocos').innerHTML = '<div class="linha">' + esc(msgErro(e)) + '</div>'; });
+  }
+  function renderAvisosHome() {
+    var c = estado.contexto, h = '';
+    if (c.prazo) {
+      var dias = Math.ceil((new Date(c.prazo + 'T23:59:59') - new Date()) / 86400000);
+      h += '<div class="alerta-caixa' + (dias > 7 ? ' info' : '') + '"><strong>Prazo do inventário: ' + fmtPrazo(c.prazo) + '</strong><span>' +
+           (dias < 0 ? 'Prazo encerrado.' : dias === 0 ? 'O prazo termina hoje.' : 'Faltam ' + dias + ' dia(s).') + '</span></div>';
+    }
+    (c.avisos || []).slice(0, 2).forEach(function (a) {
+      h += '<div class="alerta-caixa info"><strong>' + esc(a.assunto) + '</strong><span style="white-space:pre-wrap">' + esc(a.mensagem) + '</span><span>' + esc(a.data) + '</span></div>';
+    });
+    $('bl-avisos').innerHTML = h;
+  }
+  $('lista-blocos').addEventListener('click', function (e) {
+    var l = e.target.closest('.linha[data-i]');
+    if (l) abrirBloco(estado.blocos[Number(l.getAttribute('data-i'))]);
+  });
+  $('bl-sair').addEventListener('click', sair);
+  $('bl-trocar-senha').addEventListener('click', function () { abrirTrocaSenha(false); });
+  $('bl-voltar-gestao').addEventListener('click', abrirGestao);
+
+  function abrirBloco(b) {
+    estado.blocoAtual = b.bloco;
+    $('am-bloco-titulo').textContent = b.bloco + ' — toque no ambiente que você vai inventariar agora';
+    $('lista-ambientes-inv').innerHTML = b.ambientes.map(function (a, i) {
+      var feito = a.total > 0 && a.encontrados >= a.total;
+      return '<div class="linha" data-i="' + i + '"><span>' + (feito ? '✔ ' : '') + esc(a.ambiente) + '</span><span class="contagem">' + a.encontrados + '/' + a.total + '</span><span class="seta">›</span></div>';
+    }).join('');
+    mostrarTela('tela-ambientes');
+  }
+  $('am-voltar').addEventListener('click', abrirBlocos);
+  $('lista-ambientes-inv').addEventListener('click', function (e) {
+    var l = e.target.closest('.linha[data-i]');
+    if (!l) return;
+    var bl = estado.blocos.filter(function (x) { return x.bloco === estado.blocoAtual; })[0];
+    selecionarAmbiente(bl.ambientes[Number(l.getAttribute('data-i'))]);
+  });
+
+  function selecionarAmbiente(a) {
+    estado.ambienteAtual = a.ambiente;   // um ambiente por vez: um item só pode estar em um lugar
+    $('local-atual-label').textContent = a.ambiente;
+    $('progresso-label').textContent = a.encontrados + '/' + a.total;
+    mostrarTela('tela-scanner');
+    iniciarScanner();
+  }
+  $('btn-trocar-local').addEventListener('click', function () {
+    pararScanner();
+    abrirBlocoAtual();
+  });
+  function abrirBlocoAtual() {
+    apiA('getBlocos').then(function (b) {
+      estado.blocos = b;
+      var bl = b.filter(function (x) { return x.bloco === estado.blocoAtual; })[0];
+      if (bl) abrirBloco(bl); else abrirBlocos();
+    }).catch(function () { abrirBlocos(); });
+  }
+
+  // ============================================================
+  //  LEITOR DE CÓDIGO DE BARRAS
+  // ============================================================
+  function iniciarScanner() {
+    if (estado.scannerAtivo) return;
+    if (typeof Html5Qrcode === 'undefined') { toast('O leitor não carregou. Digite o código manualmente.'); return; }
+    if (!estado.scanner) estado.scanner = new Html5Qrcode('reader', { verbose: false, formatsToSupport: formatosLeitura() });
+    estado.scannerAtivo = true;
+    estado.processando = false;
+    estado.scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 260, height: 140 }, experimentalFeatures: { useBarCodeDetectorIfSupported: true } },
+      function (codigo) {
+        if (estado.processando) return;
+        estado.processando = true;
+        pararScanner().then(function () { buscar(codigo); });
+      },
+      function () { /* frame sem código */ }
+    ).then(function () { $('reader-erro').style.display = 'none'; }).catch(function (e) {
+      estado.scannerAtivo = false;
+      var nome = (e && (e.name || '')) + ' ' + (e && (e.message || e) || '');
+      var dica;
+      if (/NotAllowed|Permission|denied/i.test(nome)) dica = 'O navegador bloqueou a câmera. No iPhone: Ajustes → Safari → Câmera → Permitir (e abra o link direto no Safari, não pelo WhatsApp). No Android: toque no cadeado da barra de endereço → Permissões → Câmera.';
+      else if (/NotFound|Devices/i.test(nome)) dica = 'Não encontrei câmera neste aparelho.';
+      else if (/NotReadable|Track|in use/i.test(nome)) dica = 'A câmera está em uso por outro aplicativo. Feche os outros apps e tente de novo.';
+      else dica = 'Abra o link direto no Safari/Chrome (não dentro do WhatsApp ou de outro app).';
+      $('reader-erro-msg').textContent = dica + ' (' + nome.trim().slice(0, 120) + ')';
+      $('reader-erro').style.display = 'block';
+    });
+  }
+  $('btn-abrir-camera').addEventListener('click', function () { estado.scannerAtivo = false; iniciarScanner(); });
+  function pararScanner() {
+    if (estado.scanner && estado.scannerAtivo) {
+      estado.scannerAtivo = false;
+      return estado.scanner.stop().catch(function () { /* ignora */ });
+    }
+    return Promise.resolve();
+  }
+
+  $('btn-buscar-manual').addEventListener('click', function () {
+    var c = $('input-codigo-manual').value.trim();
+    if (!c) return;
+    $('input-codigo-manual').value = '';
+    pararScanner().then(function () { buscar(c); });
+  });
+  $('input-codigo-manual').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('btn-buscar-manual').click(); });
+
+  $('btn-ler-foto').addEventListener('click', function () { $('input-foto-codigo').click(); });
+  $('input-foto-codigo').addEventListener('change', function (e) {
+    var f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    if (typeof Html5Qrcode === 'undefined') { toast('O leitor não carregou. Digite o código manualmente.'); return; }
+    toast('Lendo a foto... pode levar alguns segundos.');
+    pararScanner().then(function () {
+      return criarLeitorFoto(Html5Qrcode, window.Html5QrcodeSupportedFormats || {}, 'reader-file')(f)
+        .catch(function (e) {
+          if (e && e.message === 'nao-leu') throw e;
+          return new Html5Qrcode('reader-file').scanFile(f, false);     // não conseguiu preparar a imagem: leitura simples
+        });
+    }).then(function (texto) { buscar(texto); })
+      .catch(function () { toast('Não li o código. Chegue mais perto, com a etiqueta inteira, bem iluminada e sem tremer — ou digite o código.'); iniciarScanner(); });
+  });
+
+  function formatosLeitura() {
+    var F = window.Html5QrcodeSupportedFormats; if (!F) return undefined;
+    return ['CODE_128','CODE_39','CODE_93','ITF','EAN_13','EAN_8','UPC_A','CODABAR','QR_CODE','DATA_MATRIX'].map(function (n) { return F[n]; }).filter(function (v) { return v !== undefined; });
+  }
+  // ---- Leitura de código por FOTO (recorta a etiqueta e tenta várias versões da imagem) ----
+// Leitura de código por FOTO: tenta várias versões da imagem até uma decodificar.
+const FORMATOS_ = ['CODE_128','CODE_39','CODE_93','ITF','EAN_13','EAN_8','UPC_A','CODABAR','QR_CODE','DATA_MATRIX'];
+function criarLeitorFoto(Html5Qrcode, Html5QrcodeSupportedFormats, idElemento) {
+  const fmts = FORMATOS_.map(n => Html5QrcodeSupportedFormats[n]).filter(v => v !== undefined);
+  function carregar(file) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); res(img); };
+      img.onerror = () => rej(new Error('imagem inválida'));
+      setTimeout(() => rej(new Error('imagem inválida')), 8000);
+      img.src = url;
+    });
+  }
+  // recorta uma janela (frações da imagem), reduz e opcionalmente gira/ajusta contraste
+  function janela(img, fx, fy, fw, fh, maxLado, rot, contraste) {
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const sx = Math.round(W * fx), sy = Math.round(H * fy), sw = Math.round(W * fw), sh = Math.round(H * fh);
+    const esc = Math.min(1, maxLado / Math.max(sw, sh));
+    const cw = Math.max(1, Math.round(sw * esc)), ch = Math.max(1, Math.round(sh * esc));
+    const c = document.createElement('canvas');
+    c.width = rot ? ch : cw; c.height = rot ? cw : ch;
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    if (contraste) g.filter = 'grayscale(1) contrast(1.6)';
+    if (rot) { g.translate(c.width, 0); g.rotate(Math.PI / 2); }
+    g.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+    return new Promise(r => c.toBlob(b => r(new File([b], 'v.png', { type: 'image/png' })), 'image/png'));
+  }
+  // Acha as regiões claras (etiqueta de papel) na foto e devolve as caixas delas, maiores primeiro.
+  // Fundo escuro ou colorido ao redor da etiqueta atrapalha o leitor; recortando só a etiqueta ele lê.
+  function regioesClaras(img) {
+    const GW = 320, esc = GW / img.naturalWidth, GH = Math.max(1, Math.round(img.naturalHeight * esc));
+    const c = document.createElement('canvas'); c.width = GW; c.height = GH;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0, GW, GH);
+    const d = g.getImageData(0, 0, GW, GH).data, N = GW * GH, lum = new Uint8Array(N), hist = new Array(256).fill(0);
+    for (let i = 0; i < N; i++) { const v = Math.round(0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]); lum[i] = v; hist[v]++; }
+    // limiar de Otsu
+    let soma = 0; for (let i = 0; i < 256; i++) soma += i * hist[i];
+    let sb = 0, wb = 0, melhor = 0, limiar = 128;
+    for (let t = 0; t < 256; t++) { wb += hist[t]; if (!wb) continue; const wf = N - wb; if (!wf) break; sb += t * hist[t]; const mb = sb / wb, mf = (soma - sb) / wf; const v = wb * wf * (mb - mf) * (mb - mf); if (v > melhor) { melhor = v; limiar = t; } }
+    const clara = new Uint8Array(N); for (let i = 0; i < N; i++) clara[i] = lum[i] > limiar ? 1 : 0;
+    // fecha as barras escuras: dilata a máscara clara na horizontal e na vertical (as barras pretas ficam "dentro" da etiqueta)
+    const k = Math.max(2, Math.round(GW / 60)), m2 = new Uint8Array(N);
+    for (let y = 0; y < GH; y++) { let ult = -1e9; for (let x = 0; x < GW; x++) { if (clara[y * GW + x]) ult = x; if (x - ult <= k) m2[y * GW + x] = 1; } ult = 1e9; for (let x = GW - 1; x >= 0; x--) { if (clara[y * GW + x]) ult = x; if (ult - x <= k) m2[y * GW + x] = 1; } }
+    const m3 = new Uint8Array(N);
+    for (let x = 0; x < GW; x++) { let ult = -1e9; for (let y = 0; y < GH; y++) { if (m2[y * GW + x]) ult = y; if (y - ult <= k) m3[y * GW + x] = 1; } ult = 1e9; for (let y = GH - 1; y >= 0; y--) { if (m2[y * GW + x]) ult = y; if (ult - y <= k) m3[y * GW + x] = 1; } }
+    // componentes conexos
+    const vis = new Uint8Array(N), caixas = [], pilha = [];
+    for (let i = 0; i < N; i++) {
+      if (!m3[i] || vis[i]) continue;
+      let area = 0, x0 = GW, y0 = GH, x1 = 0, y1 = 0; pilha.push(i); vis[i] = 1;
+      while (pilha.length) {
+        const p = pilha.pop(), x = p % GW, y = (p / GW) | 0; area++;
+        if (clara[p]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        if (x > 0 && m3[p - 1] && !vis[p - 1]) { vis[p - 1] = 1; pilha.push(p - 1); }
+        if (x < GW - 1 && m3[p + 1] && !vis[p + 1]) { vis[p + 1] = 1; pilha.push(p + 1); }
+        if (y > 0 && m3[p - GW] && !vis[p - GW]) { vis[p - GW] = 1; pilha.push(p - GW); }
+        if (y < GH - 1 && m3[p + GW] && !vis[p + GW]) { vis[p + GW] = 1; pilha.push(p + GW); }
+      }
+      if (x1 > x0 && y1 > y0 && area > N * 0.004) caixas.push({ area: area, x: x0 / GW, y: y0 / GH, w: (x1 - x0 + 1) / GW, h: (y1 - y0 + 1) / GH });
+    }
+    return caixas.sort((a, b) => b.area - a.area).slice(0, 4);
+  }
+  // janelas de vários tamanhos varrendo a foto, começando pelo centro (onde a pessoa costuma mirar)
+  const jan = [[0, 0, 1, 1]];
+  [0.7, 0.5, 0.36, 0.25].forEach(f => {
+    const passo = f / 2;
+    for (let y = 0; y + f <= 1.0001; y += passo) for (let x = 0; x + f <= 1.0001; x += passo) jan.push([x, y, f, f]);
+  });
+  [0.7, 0.5].forEach(f => {       // faixas horizontais (etiqueta de código de barras é larga e baixa)
+    for (let y = 0; y + f * 0.6 <= 1.0001; y += f * 0.3) jan.push([0, y, 1, f * 0.6]);
+  });
+  jan.sort((a, b) => (Math.hypot(a[0] + a[2] / 2 - .5, a[1] + a[3] / 2 - .5) + (a[2] === 1 && a[3] === 1 ? -1 : 0)) -
+                     (Math.hypot(b[0] + b[2] / 2 - .5, b[1] + b[3] / 2 - .5) + (b[2] === 1 && b[3] === 1 ? -1 : 0)));
+  return async function lerFoto(file, progresso) {
+    const img = await carregar(file);
+    const leitor = new Html5Qrcode(idElemento, { formatsToSupport: fmts, verbose: false, useBarCodeDetectorIfSupported: true });
+    let n = 0;
+    const auto = [];
+    try { regioesClaras(img).forEach(function (r) { [0, 0.03, -0.02].forEach(function (ins) { auto.push([Math.max(0, r.x + r.w * ins), Math.max(0, r.y + r.h * ins), Math.min(1, r.w * (1 - 2 * ins)), Math.min(1, r.h * (1 - 2 * ins))]); }); }); } catch (e) { /* segue sem recorte automático */ }
+    for (const maxLado of [1100, 700, 450]) for (const rot of [0, 1]) for (const j of auto) {
+      try { const r = await leitor.scanFile(await janela(img, j[0], j[1], j[2], j[3], maxLado, rot, false), false); if (r) return r; } catch (e) { /* próxima */ }
+    }
+    for (const maxLado of [900]) {
+      for (const rot of [0, 1]) {
+        for (const contraste of [false]) {
+          for (const j of jan) {
+            if (progresso && (++n % 12 === 0)) progresso(n);
+            try {
+              const f = await janela(img, j[0], j[1], j[2], j[3], maxLado, rot, contraste);
+              const r = await leitor.scanFile(f, false);
+              if (r) return r;
+            } catch (e) { /* tenta a próxima janela */ }
+          }
+        }
+      }
+    }
+    throw new Error('nao-leu');
+  };
+}
+
+  function buscar(codigo) {
+    estado.codigoLido = codigo;
+    toast('Buscando ' + codigo + '...');
+    apiA('buscarItem', codigo, estado.blocoAtual, estado.ambienteAtual).then(function (lista) {
+      if (lista && lista.length === 1) exibirItem(lista[0]);
+      else if (lista && lista.length > 1) exibirEscolha(codigo, lista);
+      else {
+        $('codigo-nao-encontrado').textContent = 'Código lido: ' + codigo;
+        $('input-observacao-nc').value = ''; $('preview-foto-nc').innerHTML = ''; $('input-foto-nc').value = ''; estado.fotoNC = '';
+        mostrarTela('tela-nao-catalogado');
+      }
+    }).catch(function (e) { toast(msgErro(e)); mostrarTela('tela-scanner'); iniciarScanner(); });
+  }
+
+  function semPatrimonio(item) { return /^(CTRL|COD)-/.test(item.Patrimonio); }
+  function rotuloId(item) {
+    return semPatrimonio(item) ? 'Sem patrimônio' + (item.NumControle ? ' · Nº controle ' + item.NumControle : '') : item.Patrimonio;
+  }
+
+  function exibirEscolha(codigo, lista) {
+    $('escolha-codigo').textContent = 'Código lido: ' + codigo;
+    $('escolha-lista').innerHTML = lista.map(function (it, n) {
+      return '<button class="card-item escolha" data-n="' + n + '"><b>' + esc(it.Descricao) + '</b><br>' + esc(rotuloId(it)) +
+        (it.CodBarras ? ' · Cód. ' + esc(it.CodBarras) : '') + '<br>' + esc(it.Bloco) + ' · ' + esc(it.Ambiente) +
+        (it.Encontrado === true ? '<br><i>já encontrado em ' + esc(it.AmbienteEncontrado || '—') + '</i>' : '') + '</button>';
+    }).join('');
+    Array.prototype.forEach.call($('escolha-lista').querySelectorAll('button'), function (b) {
+      b.addEventListener('click', function () { exibirItem(lista[Number(b.getAttribute('data-n'))]); });
+    });
+    mostrarTela('tela-escolha');
+  }
+  $('btn-escolha-voltar').addEventListener('click', function () { mostrarTela('tela-scanner'); iniciarScanner(); });
+
+  function exibirItem(item) {
+    estado.itemAtual = item;
+    var ja = item.Encontrado === true;
+    var alertas = '';
+    if (ja) {
+      alertas += '<div class="alerta-caixa"><strong>Item encontrado no ambiente ' + esc(item.AmbienteEncontrado || '—') + '</strong>' +
+        '<span>' + (item.BlocoEncontrado ? esc(item.BlocoEncontrado) + ' · ' : '') + 'confirmado por ' + esc(item.VerificadoPorNome || item.VerificadoPor) + ' em ' + esc(item.DataVerificacao) + '</span>' +
+        '<span>Se for o mesmo item, registre abaixo o que está acontecendo.</span></div>';
+    }
+    if (item._ambienteDiferente) {
+      alertas += '<div class="alerta-caixa info"><strong>Cadastrado em outro ambiente</strong><span>Pelo cadastro, este item é de ' + esc(item.Ambiente) + ' (' + esc(item.Bloco) +
+        '). Se confirmar, será registrado como encontrado em ' + esc(estado.ambienteAtual) + '.</span></div>';
+    }
+    $('item-alertas').innerHTML = alertas;
+    $('item-titulo').textContent = ja ? 'Item já verificado' : 'Item encontrado na base';
+    $('btn-confirmar-item').textContent = ja ? 'Registrar nova confirmação neste ambiente' : 'Confirmar que encontrei este item';
+    $('input-observacao').placeholder = ja ? 'Explique o que está acontecendo (ex: item movido, etiqueta duplicada...)' : 'Ex: item danificado, etiqueta ilegível...';
+
+    var campo = function (r, v, d) { return '<div class="campo"><div class="rotulo">' + r + '</div><div class="valor' + (d ? ' destaque' : '') + '">' + (v || '—') + '</div></div>'; };
+    var sit = esc(item.SituacaoOriginal || '—');
+    $('item-detalhes').innerHTML = campo('Descrição', esc(item.Descricao), true) + campo('Patrimônio', semPatrimonio(item) ? 'Sem nº de patrimônio' : esc(item.Patrimonio)) + campo('Nº de controle', esc(item.NumControle)) + campo('Código de barras', esc(item.CodBarras)) +
+      campo('Nº de série', esc(item.NumSerie)) + campo('Responsável', esc(item.Responsavel)) + campo('Conservação', esc(item.Conservacao)) +
+      campo('Local no cadastro', esc(item.Bloco) + '<br>' + esc(item.Ambiente)) + campo('Situação no cadastro', sit);
+
+    $('input-foto').value = ''; $('preview-foto').innerHTML = ''; estado.fotoBase64 = '';
+    $('input-observacao').value = '';
+    mostrarTela('tela-item');
+    if (ja) $('input-observacao').focus();
+  }
+
+  // Reduz a foto antes de enviar (fotos de celular têm vários MB)
+  function reduzirImagem(file, maxLado, qualidade) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        var w = img.width, h = img.height, s = Math.min(1, maxLado / Math.max(w, h));
+        w = Math.round(w * s); h = Math.round(h * s);
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', qualidade));
+      };
+      img.onerror = function () { reject(new Error('Não consegui ler a imagem.')); };
+      img.src = url;
+    });
+  }
+  $('input-foto').addEventListener('change', function (e) {
+    if (!e.target.files[0]) return;
+    reduzirImagem(e.target.files[0], 1280, 0.72).then(function (b64) {
+      estado.fotoBase64 = b64; $('preview-foto').innerHTML = '<img src="' + b64 + '" alt="Prévia da foto">';
+    }).catch(function (er) { toast(msgErro(er)); });
+  });
+  $('input-foto-nc').addEventListener('change', function (e) {
+    if (!e.target.files[0]) return;
+    reduzirImagem(e.target.files[0], 1280, 0.72).then(function (b64) {
+      estado.fotoNC = b64; $('preview-foto-nc').innerHTML = '<img src="' + b64 + '" alt="Prévia da foto">';
+    }).catch(function (er) { toast(msgErro(er)); });
+  });
+
+  $('btn-confirmar-item').addEventListener('click', function () {
+    var btn = $('btn-confirmar-item'), txt = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Salvando...';
+    apiA('confirmarItem', estado.itemAtual.Patrimonio, estado.blocoAtual, estado.ambienteAtual, estado.fotoBase64, $('input-observacao').value.trim())
+      .then(function (r) {
+        btn.disabled = false; btn.textContent = txt;
+        $('progresso-label').textContent = r.progresso.encontrados + '/' + r.progresso.total;
+        toast('Item confirmado!');
+        mostrarTela('tela-scanner'); iniciarScanner();
+      }).catch(function (e) { btn.disabled = false; btn.textContent = txt; toast(msgErro(e)); });
+  });
+  $('btn-nao-e-este').addEventListener('click', function () { mostrarTela('tela-scanner'); iniciarScanner(); });
+
+  $('btn-registrar-nc').addEventListener('click', function () {
+    var btn = $('btn-registrar-nc'); btn.disabled = true;
+    apiA('registrarNaoCatalogado', estado.codigoLido, estado.blocoAtual, estado.ambienteAtual, estado.fotoNC, $('input-observacao-nc').value.trim())
+      .then(function () { btn.disabled = false; toast('Registrado como não catalogado.'); mostrarTela('tela-scanner'); iniciarScanner(); })
+      .catch(function (e) { btn.disabled = false; toast(msgErro(e)); });
+  });
+  $('btn-voltar-scanner-nc').addEventListener('click', function () { mostrarTela('tela-scanner'); iniciarScanner(); });
+</script>
+
+</body>
+</html>
