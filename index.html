@@ -106,6 +106,17 @@
   .tag { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #e5e7eb; color: #374151; }
   .tag.ok { background: var(--verde-bg); color: var(--verde); }
   .tag.aviso { background: var(--ambar-bg); color: var(--ambar); }
+  .rel-sub { font-size: 15px; margin: 14px 0 6px; }
+  #area-impressao { display: none; }
+  #area-impressao h1 { font-size: 18px; margin: 0 0 4px; } #area-impressao h2 { font-size: 15px; margin: 16px 0 6px; }
+  #area-impressao table { font-size: 11px; } #area-impressao th, #area-impressao td { border: 1px solid #999; padding: 3px 5px; text-align: left; vertical-align: top; }
+  @media print {
+    body.imprimindo #app { display: none !important; }
+    body.imprimindo #area-impressao { display: block; padding: 8px; color: #000; background: #fff; }
+    @page { size: A4 landscape; margin: 10mm; }
+  }
+  .btn-baixa { color: #991b1b; border-color: #fca5a5; }
+  .btn-baixa:disabled { opacity: .6; }
   .tag.erro { background: #fee2e2; color: #991b1b; }
 
   .segmento { display: inline-flex; background: #e5e7eb; border-radius: 10px; padding: 3px; margin-bottom: 14px; }
@@ -247,6 +258,8 @@
     <nav class="abas" id="gs-abas">
       <button class="aba ativa" data-aba="andamento">Andamento</button>
       <button class="aba" data-aba="inventariados">Inventariados</button>
+      <button class="aba" data-aba="baixa">Itens para baixa</button>
+      <button class="aba" data-aba="relatorios">Relatórios</button>
       <button class="aba" data-aba="usuarios">Usuários</button>
       <button class="aba" data-aba="ambientes">Ambientes</button>
       <button class="aba" data-aba="avisos">Prazo e avisos</button>
@@ -267,6 +280,10 @@
           <div class="filtros">
             <select id="f-bloco"><option value="">Todos os blocos</option></select>
             <select id="f-ambiente"><option value="">Todos os ambientes</option></select>
+            <select id="f-baixa">
+              <option value="">Baixa: todos</option>
+              <option value="Sim">Somente itens para baixa</option>
+            </select>
             <select id="f-digitado">
               <option value="">Digitado na UFSC: todos</option>
               <option value="Sim">Digitado: Sim</option>
@@ -284,6 +301,34 @@
           <button id="btn-mais" class="btn-secundario" style="display:none">Mostrar mais</button>
         </div>
         <div id="sub-nc" style="display:none"><div id="lista-nc"></div></div>
+      </section>
+
+      <!-- Itens para baixa -->
+      <section class="painel" id="painel-baixa">
+        <p class="ajuda">Itens que os inventariantes marcaram com “Pedir baixa do item”. Cada pedido traz o motivo, quem pediu e o local onde o item está.</p>
+        <div class="filtros">
+          <select id="fb-bloco"><option value="">Todos os blocos</option></select>
+          <input type="text" id="fb-busca" placeholder="Buscar patrimônio, código ou descrição">
+        </div>
+        <div id="fb-contagem" class="ajuda"></div>
+        <div id="lista-baixa"></div>
+      </section>
+
+      <!-- Relatórios -->
+      <section class="painel" id="painel-relatorios">
+        <div class="segmento" id="rel-tipos">
+          <button class="seg ativo" data-rel="mudanca">Mudança de local</button>
+          <button class="seg" data-rel="sempat">Sem patrimônio</button>
+          <button class="seg" data-rel="baixa">Itens para baixa</button>
+        </div>
+        <p class="ajuda" id="rel-descricao"></p>
+        <div class="filtros"><select id="rel-bloco"><option value="">Todos os blocos</option></select></div>
+        <div class="acoes-lote">
+          <span id="rel-contagem" class="ajuda"></span>
+          <button class="btn-pequeno" id="rel-csv">Baixar planilha (CSV)</button>
+          <button class="btn-pequeno claro" id="rel-imprimir">Imprimir / salvar PDF</button>
+        </div>
+        <div id="rel-corpo"></div>
       </section>
 
       <!-- Usuários -->
@@ -420,6 +465,8 @@
       <label for="input-observacao">Observação (opcional)</label>
       <textarea id="input-observacao" rows="3"></textarea>
       <button id="btn-confirmar-item" class="btn-primario">Confirmar que encontrei este item</button>
+      <button id="btn-pedir-baixa" class="btn-secundario btn-baixa" type="button">Pedir baixa do item</button>
+      <div id="baixa-ajuda" class="ajuda">Para pedir baixa, descreva o motivo no campo Observação (ex.: quebrado, inservível).</div>
       <button id="btn-nao-e-este" class="btn-secundario">Não é este item / ler outro código</button>
     </div>
   </div>
@@ -452,6 +499,7 @@
   </div>
   <div id="toast" class="toast"></div>
 </div>
+<div id="area-impressao"></div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -505,7 +553,7 @@
   // funciona assim) que chama o Apps Script por fetch; o endereço do setor vem em ?api=... e fica salvo no aparelho.
   var MODO_EXTERNO = (typeof google === 'undefined' || !google.script || !google.script.run);
   var API_URL = '';
-  var API_PADRAO = 'https://script.google.com/macros/s/AKfycbymGhvNuoH1Ak9nFlCByQ48uQ2aEi8xjpZoeGJ49Qnb1h6pHTi0JfobKQ4cPSRbE_hI/exec';   // preenchido pelo build_static.py --api LINK (página já vem apontando para o setor)
+  var API_PADRAO = '';   // preenchido pelo build_static.py --api LINK (página já vem apontando para o setor)
   function lerApiUrl() {
     try {
       var q = new URLSearchParams(location.search).get('api');
@@ -690,9 +738,156 @@
     document.querySelectorAll('#gs-abas .aba').forEach(function (b) { b.classList.toggle('ativa', b.getAttribute('data-aba') === nome); });
     document.querySelectorAll('.painel').forEach(function (p) { p.classList.toggle('ativo', p.id === 'painel-' + nome); });
     var carregar = { andamento: carregarAndamento, inventariados: carregarInventariados, usuarios: carregarUsuarios,
-                     ambientes: carregarAmbientesGestao, avisos: carregarAvisos }[nome];
+                     ambientes: carregarAmbientesGestao, avisos: carregarAvisos, baixa: carregarBaixa, relatorios: carregarRelatorios }[nome];
     if (carregar) carregar();
   }
+
+  // ============================================================
+  //  GESTÃO — ITENS PARA BAIXA
+  // ============================================================
+  function carregarBaixa() {
+    $('lista-baixa').innerHTML = '<div class="carregando-txt">Carregando...</div>';
+    apiA('listarInventariados').then(function (lista) {
+      estado.inv = lista; estado.invSel = new Set();
+      estado.baixaLista = lista.filter(function (i) { return i.baixa; }).sort(function (a, b) { return b.baixaTs - a.baixaTs; });
+      var blocos = {};
+      estado.baixaLista.forEach(function (i) { blocos[i.blocoEncontrado || i.bloco] = true; });
+      var sel = $('fb-bloco'), atual = sel.value;
+      sel.innerHTML = '<option value="">Todos os blocos</option>' + Object.keys(blocos).sort().map(function (b) { return '<option>' + esc(b) + '</option>'; }).join('');
+      sel.value = blocos[atual] ? atual : '';
+      renderBaixa();
+    }).catch(function (e) { $('lista-baixa').innerHTML = '<div class="status-msg erro">' + esc(msgErro(e)) + '</div>'; });
+  }
+  function renderBaixa() {
+    var b = $('fb-bloco').value, q = $('fb-busca').value.trim().toLowerCase();
+    var f = (estado.baixaLista || []).filter(function (i) {
+      if (b && (i.blocoEncontrado || i.bloco) !== b) return false;
+      if (q && (i.patrimonio + ' ' + i.codBarras + ' ' + i.numControle + ' ' + i.descricao).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    $('fb-contagem').textContent = f.length + ' item(ns) para baixa';
+    if (!f.length) { $('lista-baixa').innerHTML = '<div class="cartao">Nenhum item com pedido de baixa.</div>'; return; }
+    $('lista-baixa').innerHTML = f.map(function (i) {
+      var local = (i.blocoEncontrado || i.bloco) + ' · ' + (i.ambienteEncontrado || i.ambiente);
+      return '<div class="item-linha">' +
+        '<span></span><div class="desc">' + esc(i.descricao || '(sem descrição)') + '</div>' +
+        '<div class="acao"><button class="btn-pequeno claro" data-cancelar-baixa="' + esc(i.patrimonio) + '">Cancelar pedido</button></div>' +
+        '<div class="meta">' + (/^(CTRL|COD)-/.test(i.patrimonio) ? 'Sem patrimônio · Controle <b>' + esc(i.numControle || i.patrimonio) + '</b>' : 'Patrimônio <b>' + esc(i.patrimonio) + '</b>') + (i.codBarras ? ' · Cód. ' + esc(i.codBarras) : '') + '</div>' +
+        '<div class="meta">' + esc(local) + '</div>' +
+        '<div class="meta"><b>Motivo:</b> ' + esc(i.baixaMotivo) + '</div>' +
+        '<div class="meta">Pedido por ' + esc(i.baixaPor) + ' em ' + esc(i.baixaEm) +
+          i.fotos.map(function (u, k) { return ' · <a href="' + esc(u) + '" target="_blank" rel="noopener">foto' + (i.fotos.length > 1 ? ' ' + (k + 1) : '') + '</a>'; }).join('') + '</div></div>';
+    }).join('');
+  }
+  $('fb-bloco').addEventListener('change', renderBaixa);
+  $('fb-busca').addEventListener('input', renderBaixa);
+  $('lista-baixa').addEventListener('click', function (e) {
+    var p = e.target.getAttribute && e.target.getAttribute('data-cancelar-baixa');
+    if (!p) return;
+    apiA('cancelarPedidoBaixa', p).then(function () { toast('Pedido de baixa cancelado.'); carregarBaixa(); })
+      .catch(function (er) { toast(msgErro(er)); });
+  });
+
+  // ============================================================
+  //  GESTÃO — RELATÓRIOS
+  // ============================================================
+  var RELATORIOS = {
+    mudanca: { titulo: 'Relatório de mudança de local',
+      desc: 'Itens encontrados em local diferente do cadastro de origem (bloco ou ambiente).' },
+    sempat: { titulo: 'Relatório de itens sem patrimônio encontrados',
+      desc: 'Itens do relatório da UFSC que não têm nº de patrimônio e foram encontrados, mais os itens não catalogados registrados em campo.' },
+    baixa: { titulo: 'Relatório de itens para baixa',
+      desc: 'Itens com pedido de baixa feito pelos inventariantes, com o motivo.' }
+  };
+  function idItem(i) { return /^(CTRL|COD)-/.test(i.patrimonio) ? 'S/ patrimônio (controle ' + (i.numControle || i.patrimonio) + ')' : i.patrimonio; }
+  function localOrigem(i) { return i.bloco + ' · ' + i.ambiente; }
+  function localEnc(i) { return (i.blocoEncontrado || i.bloco) + ' · ' + (i.ambienteEncontrado || i.ambiente); }
+  function carregarRelatorios() {
+    $('rel-corpo').innerHTML = '<div class="carregando-txt">Carregando...</div>';
+    Promise.all([apiA('listarInventariados'), apiA('listarNaoCatalogados')]).then(function (r) {
+      estado.relInv = r[0]; estado.relNc = r[1];
+      var blocos = {};
+      r[0].forEach(function (i) { blocos[i.blocoEncontrado || i.bloco] = true; });
+      r[1].forEach(function (x) { blocos[x.bloco] = true; });
+      var sel = $('rel-bloco'), atual = sel.value;
+      sel.innerHTML = '<option value="">Todos os blocos</option>' + Object.keys(blocos).sort().map(function (b) { return '<option>' + esc(b) + '</option>'; }).join('');
+      sel.value = blocos[atual] ? atual : '';
+      renderRelatorio();
+    }).catch(function (e) { $('rel-corpo').innerHTML = '<div class="status-msg erro">' + esc(msgErro(e)) + '</div>'; });
+  }
+  // Monta o relatório: { titulo, secoes: [{ titulo, cab: [...], linhas: [[...]] }] }
+  function montarRelatorio() {
+    var tipo = (document.querySelector('#rel-tipos .seg.ativo') || {}).getAttribute('data-rel') || 'mudanca';
+    var b = $('rel-bloco').value, inv = estado.relInv || [], nc = estado.relNc || [];
+    var noBloco = function (i) { return !b || (i.blocoEncontrado || i.bloco) === b; };
+    var R = { tipo: tipo, titulo: RELATORIOS[tipo].titulo, desc: RELATORIOS[tipo].desc, secoes: [] };
+    var fotos = function (i) { return i.fotos.join(' '); };
+    if (tipo === 'mudanca') {
+      R.secoes.push({ titulo: '', cab: ['Patrimônio / controle', 'Descrição', 'Local de origem (cadastro)', 'Local onde foi encontrado', 'Verificado por', 'Data', 'Observação'],
+        linhas: inv.filter(function (i) { return i.mudouAmbiente && noBloco(i); }).map(function (i) {
+          return [idItem(i), i.descricao, localOrigem(i), localEnc(i), i.verificadoPor, i.data, i.observacao]; }) });
+    } else if (tipo === 'sempat') {
+      R.secoes.push({ titulo: 'Itens sem patrimônio encontrados', cab: ['Nº de controle', 'Cód. barras', 'Descrição', 'Local no cadastro', 'Local onde foi encontrado', 'Verificado por', 'Data', 'Observação'],
+        linhas: inv.filter(function (i) { return /^(CTRL|COD)-/.test(i.patrimonio) && noBloco(i); }).map(function (i) {
+          return [i.numControle || i.patrimonio, i.codBarras, i.descricao, localOrigem(i), localEnc(i), i.verificadoPor, i.data, i.observacao]; }) });
+      R.secoes.push({ titulo: 'Itens não catalogados (não constam na base)', cab: ['Código lido', 'Local', 'Registrado por', 'Data', 'Observação'],
+        linhas: nc.filter(function (x) { return !b || x.bloco === b; }).map(function (x) {
+          return [x.codigo, x.bloco + ' · ' + x.ambiente, x.usuario, x.data, x.observacao]; }) });
+    } else {
+      R.secoes.push({ titulo: '', cab: ['Patrimônio / controle', 'Descrição', 'Local', 'Motivo da baixa', 'Pedido por', 'Data do pedido'],
+        linhas: inv.filter(function (i) { return i.baixa && noBloco(i); }).sort(function (a, c) { return c.baixaTs - a.baixaTs; }).map(function (i) {
+          return [idItem(i), i.descricao, localEnc(i), i.baixaMotivo, i.baixaPor, i.baixaEm]; }) });
+    }
+    return R;
+  }
+  function tabelaHtml(sec) {
+    if (!sec.linhas.length) return '<div class="cartao">Nenhum registro.</div>';
+    return '<div class="cartao rolagem"><table><thead><tr>' + sec.cab.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      sec.linhas.map(function (l) { return '<tr>' + l.map(function (v) { return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+  }
+  function renderRelatorio() {
+    var R = montarRelatorio(); estado.relAtual = R;
+    $('rel-descricao').textContent = R.desc;
+    var total = R.secoes.reduce(function (n, s) { return n + s.linhas.length; }, 0);
+    $('rel-contagem').textContent = R.secoes.map(function (s) { return s.linhas.length + (s.titulo ? ' ' + s.titulo.toLowerCase() : ' item(ns)'); }).join(' · ');
+    $('rel-corpo').innerHTML = R.secoes.map(function (s) { return (s.titulo ? '<h3 class="rel-sub">' + esc(s.titulo) + '</h3>' : '') + tabelaHtml(s); }).join('');
+    return total;
+  }
+  function dataHoje() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+  function relCsv() {
+    var R = estado.relAtual; if (!R) return '';
+    var cel = function (v) { v = String(v == null ? '' : v); return /[;"\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var out = [cel(R.titulo), cel((estado.nomeSetor || '') + ' · gerado em ' + dataHoje()), ''];
+    R.secoes.forEach(function (s) {
+      if (s.titulo) out.push(cel(s.titulo));
+      out.push(s.cab.map(cel).join(';'));
+      s.linhas.forEach(function (l) { out.push(l.map(function (v) { return (/^0\d+$/.test(String(v)) ? '="' + v + '"' : cel(v)); }).join(';')); });
+      out.push('');
+    });
+    return '\ufeff' + out.join('\r\n');
+  }
+  $('rel-tipos').addEventListener('click', function (e) {
+    var b = e.target.closest('.seg'); if (!b) return;
+    document.querySelectorAll('#rel-tipos .seg').forEach(function (x) { x.classList.toggle('ativo', x === b); });
+    renderRelatorio();
+  });
+  $('rel-bloco').addEventListener('change', renderRelatorio);
+  $('rel-csv').addEventListener('click', function () {
+    var R = estado.relAtual; if (!R) return;
+    var blob = new Blob([relCsv()], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'relatorio-' + R.tipo + '.csv'; document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  });
+  $('rel-imprimir').addEventListener('click', function () {
+    var R = estado.relAtual; if (!R) return;
+    $('area-impressao').innerHTML = '<h1>' + esc(R.titulo) + '</h1><div>' + esc(estado.nomeSetor || '') + ' · gerado em ' + esc(dataHoje()) + '</div>' +
+      R.secoes.map(function (s) { return (s.titulo ? '<h2>' + esc(s.titulo) + '</h2>' : '') + (s.linhas.length ? tabelaHtml(s).replace('cartao rolagem', '') : '<p>Nenhum registro.</p>'); }).join('');
+    document.body.classList.add('imprimindo');
+    var fim = function () { document.body.classList.remove('imprimindo'); window.removeEventListener('afterprint', fim); };
+    window.addEventListener('afterprint', fim);
+    try { window.print(); } catch (e) { fim(); }
+  });
 
   // ============================================================
   //  GESTÃO — ANDAMENTO
@@ -792,6 +987,7 @@
       if (b && (i.blocoEncontrado || i.bloco) !== b) return false;
       if (a && (i.ambienteEncontrado || i.ambiente) !== a) return false;
       if (d && i.digitado !== d) return false;
+      if ($('f-baixa').value && !i.baixa) return false;
       if (q && (i.patrimonio + ' ' + i.codBarras + ' ' + i.numControle + ' ' + i.descricao).toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -813,7 +1009,7 @@
         '<div class="acao"><select class="dig" data-pat="' + esc(i.patrimonio) + '"><option' + (i.digitado === 'Sim' ? ' selected' : '') + '>Sim</option><option' + (i.digitado !== 'Sim' ? ' selected' : '') + '>Não</option></select>' +
         '<div class="ajuda">Digitado na UFSC</div></div>' +
         '<div class="meta">' + (/^(CTRL|COD)-/.test(i.patrimonio) ? 'Sem patrimônio · Controle <b>' + esc(i.numControle || i.patrimonio) + '</b>' : 'Patrimônio <b>' + esc(i.patrimonio) + '</b>') + (i.codBarras ? ' · Cód. ' + esc(i.codBarras) : '') + '</div>' +
-        '<div class="meta">' + esc(local) + (i.mudouAmbiente ? ' <span class="tag aviso">cadastrado em ' + esc(i.ambiente) + '</span>' : '') + '</div>' +
+        '<div class="meta">' + esc(local) + (i.mudouAmbiente ? ' <span class="tag aviso">cadastrado em ' + esc(i.ambiente) + '</span>' : '') + (i.baixa ? ' <span class="tag erro">Baixa solicitada</span>' : '') + '</div>' +
         '<div class="meta">Por ' + esc(i.verificadoPor) + ' em ' + esc(i.data) +
           i.fotos.map(function (u, k) { return ' · <a href="' + esc(u) + '" target="_blank" rel="noopener">foto' + (i.fotos.length > 1 ? ' ' + (k + 1) : '') + '</a>'; }).join('') +
           (i.digitado === 'Sim' && i.digitadoPor ? ' · digitado por ' + esc(i.digitadoPor) + ' em ' + esc(i.digitadoEm) : '') + '</div>' +
@@ -825,7 +1021,7 @@
   }
 
   ['f-bloco'].forEach(function (id) { $(id).addEventListener('change', function () { popularAmbientesFiltro(); aplicarFiltros(); }); });
-  ['f-ambiente', 'f-digitado'].forEach(function (id) { $(id).addEventListener('change', aplicarFiltros); });
+  ['f-ambiente', 'f-digitado', 'f-baixa'].forEach(function (id) { $(id).addEventListener('change', aplicarFiltros); });
   $('f-busca').addEventListener('input', aplicarFiltros);
   $('btn-mais').addEventListener('click', function () { estado.invMostrar += 100; renderInventariados(); });
   $('f-todos').addEventListener('change', function () {
@@ -1453,6 +1649,11 @@ function criarLeitorFoto(Html5Qrcode, Html5QrcodeSupportedFormats, idElemento) {
       alertas += '<div class="alerta-caixa info"><strong>Cadastrado em outro ambiente</strong><span>Pelo cadastro, este item é de ' + esc(item.Ambiente) + ' (' + esc(item.Bloco) +
         '). Se confirmar, será registrado como encontrado em ' + esc(estado.ambienteAtual) + '.</span></div>';
     }
+    if (item.BaixaSolicitada === 'Sim') {
+      alertas += '<div class="alerta-caixa"><strong>Baixa já solicitada para este item</strong><span>Motivo: ' + esc(item.BaixaMotivo) + '</span></div>';
+    }
+    $('btn-pedir-baixa').style.display = item.BaixaSolicitada === 'Sim' ? 'none' : '';
+    $('baixa-ajuda').style.display = item.BaixaSolicitada === 'Sim' ? 'none' : '';
     $('item-alertas').innerHTML = alertas;
     $('item-titulo').textContent = ja ? 'Item já verificado' : 'Item encontrado na base';
     $('btn-confirmar-item').textContent = ja ? 'Registrar nova confirmação neste ambiente' : 'Confirmar que encontrei este item';
@@ -1507,6 +1708,20 @@ function criarLeitorFoto(Html5Qrcode, Html5QrcodeSupportedFormats, idElemento) {
         btn.disabled = false; btn.textContent = txt;
         $('progresso-label').textContent = r.progresso.encontrados + '/' + r.progresso.total;
         toast('Item confirmado!');
+        mostrarTela('tela-scanner'); iniciarScanner();
+      }).catch(function (e) { btn.disabled = false; btn.textContent = txt; toast(msgErro(e)); });
+  });
+  $('btn-pedir-baixa').addEventListener('click', function () {
+    var motivo = $('input-observacao').value.trim();
+    if (!motivo) { toast('Descreva o motivo da baixa no campo Observação.'); $('input-observacao').focus(); return; }
+    if (!confirm('Pedir a baixa deste item?\n\n' + (estado.itemAtual.Descricao || '') + '\nMotivo: ' + motivo)) return;
+    var btn = $('btn-pedir-baixa'), txt = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Enviando...';
+    apiA('pedirBaixa', estado.itemAtual.Patrimonio, estado.blocoAtual, estado.ambienteAtual, motivo, estado.fotoBase64)
+      .then(function (r) {
+        btn.disabled = false; btn.textContent = txt;
+        $('progresso-label').textContent = r.progresso.encontrados + '/' + r.progresso.total;
+        toast('Pedido de baixa registrado.');
         mostrarTela('tela-scanner'); iniciarScanner();
       }).catch(function (e) { btn.disabled = false; btn.textContent = txt; toast(msgErro(e)); });
   });
