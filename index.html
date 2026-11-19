@@ -218,6 +218,7 @@
   <div id="tela-login" class="tela">
     <div class="cabecalho"><h1>Inventário patrimonial</h1><p class="subtitulo" id="login-setor"></p></div>
     <div class="conteudo estreito">
+      <div class="aviso-camera alerta-caixa" style="display:none"></div>
       <label for="lg-email">E-mail</label>
       <input type="email" id="lg-email" autocomplete="username">
       <label for="lg-senha">Senha</label>
@@ -320,6 +321,7 @@
           <button class="seg ativo" data-rel="mudanca">Mudança de local</button>
           <button class="seg" data-rel="sempat">Sem patrimônio</button>
           <button class="seg" data-rel="baixa">Itens para baixa</button>
+          <button class="seg" data-rel="naoenc">Não encontrados por local</button>
         </div>
         <p class="ajuda" id="rel-descricao"></p>
         <div class="filtros"><select id="rel-bloco"><option value="">Todos os blocos</option></select></div>
@@ -431,6 +433,7 @@
   </div>
 
   <div id="tela-scanner" class="tela">
+    <div class="aviso-camera alerta-caixa" style="display:none;margin:8px"></div>
     <div class="topo-scanner">
       <button id="btn-trocar-local" class="btn-link">◀ Trocar ambiente</button>
       <span id="local-atual-label"></span>
@@ -451,6 +454,19 @@
     <div class="conteudo estreito" style="flex:0">
       <button id="btn-ler-foto" class="btn-secundario">Câmera não abriu? Ler o código por foto</button>
       <input type="file" id="input-foto-codigo" accept="image/*" capture="environment" style="display:none">
+      <button id="btn-conferir-local" class="btn-secundario" type="button">Conferir os itens que faltam neste ambiente</button>
+    </div>
+  </div>
+
+  <div id="tela-conferencia" class="tela">
+    <div class="cabecalho">
+      <button class="btn-link btn-link-topo" id="cf-voltar">◀ Voltar a ler códigos</button>
+      <h1>Itens não encontrados</h1>
+      <p class="subtitulo" id="cf-local"></p>
+    </div>
+    <div class="conteudo estreito">
+      <p class="ajuda">Aqui aparecem só os itens deste ambiente que <b>ainda não foram encontrados em nenhum lugar</b>. Para cada um: tire a <b>foto do item</b> e confirme que encontrou, ou marque <b>NÃO ENCONTRADO</b>.</p>
+      <div id="cf-corpo"></div>
     </div>
   </div>
 
@@ -635,6 +651,13 @@
     }
     api('getStatus').then(function (st) {
       estado.nomeSetor = st.nomeSetor;
+      if (!MODO_EXTERNO && st.urlApp && /^https:\/\//.test(st.urlApp)) {
+        // Dentro do Google a câmera é bloqueada: leva a pessoa à página do app (com ?api=), onde a câmera funciona.
+        Array.prototype.forEach.call(document.querySelectorAll('.aviso-camera'), function (el) {
+          el.innerHTML = '<strong>A câmera ao vivo não funciona nesta tela do Google.</strong><span>Abra o app por <a target="_top" href="' + esc(st.urlApp) + '">este link</a> para ler o código de barras pela câmera.</span>';
+          el.style.display = '';
+        });
+      }
       if (!st.configurado) { mostrarTela('tela-ativacao'); return; }
       $('login-setor').textContent = st.nomeSetor || '';
       var t = lerToken();
@@ -797,18 +820,21 @@
     sempat: { titulo: 'Relatório de itens sem patrimônio encontrados',
       desc: 'Itens do relatório da UFSC que não têm nº de patrimônio e foram encontrados, mais os itens não catalogados registrados em campo.' },
     baixa: { titulo: 'Relatório de itens para baixa',
-      desc: 'Itens com pedido de baixa feito pelos inventariantes, com o motivo.' }
+      desc: 'Itens com pedido de baixa feito pelos inventariantes, com o motivo.' },
+    naoenc: { titulo: 'Relatório de itens não encontrados por local',
+      desc: 'Itens que não foram encontrados em nenhum local, agrupados pelo local de origem. Itens cadastrados em um local mas achados em outro não entram aqui (veja “Mudança de local”).' }
   };
   function idItem(i) { return /^(CTRL|COD)-/.test(i.patrimonio) ? 'S/ patrimônio (controle ' + (i.numControle || i.patrimonio) + ')' : i.patrimonio; }
   function localOrigem(i) { return i.bloco + ' · ' + i.ambiente; }
   function localEnc(i) { return (i.blocoEncontrado || i.bloco) + ' · ' + (i.ambienteEncontrado || i.ambiente); }
   function carregarRelatorios() {
     $('rel-corpo').innerHTML = '<div class="carregando-txt">Carregando...</div>';
-    Promise.all([apiA('listarInventariados'), apiA('listarNaoCatalogados')]).then(function (r) {
-      estado.relInv = r[0]; estado.relNc = r[1];
+    Promise.all([apiA('listarInventariados'), apiA('listarNaoCatalogados'), apiA('listarNaoEncontrados')]).then(function (r) {
+      estado.relInv = r[0]; estado.relNc = r[1]; estado.relNe = r[2];
       var blocos = {};
       r[0].forEach(function (i) { blocos[i.blocoEncontrado || i.bloco] = true; });
       r[1].forEach(function (x) { blocos[x.bloco] = true; });
+      r[2].forEach(function (x) { blocos[x.bloco] = true; });
       var sel = $('rel-bloco'), atual = sel.value;
       sel.innerHTML = '<option value="">Todos os blocos</option>' + Object.keys(blocos).sort().map(function (b) { return '<option>' + esc(b) + '</option>'; }).join('');
       sel.value = blocos[atual] ? atual : '';
@@ -833,6 +859,18 @@
       R.secoes.push({ titulo: 'Itens não catalogados (não constam na base)', cab: ['Código lido', 'Local', 'Registrado por', 'Data', 'Observação'],
         linhas: nc.filter(function (x) { return !b || x.bloco === b; }).map(function (x) {
           return [x.codigo, x.bloco + ' · ' + x.ambiente, x.usuario, x.data, x.observacao]; }) });
+    } else if (tipo === 'naoenc') {
+      var ne = (estado.relNe || []).filter(function (i) { return !b || i.bloco === b; });
+      var porLocal = {};
+      ne.forEach(function (i) { (porLocal[i.bloco + ' · ' + i.ambiente] = porLocal[i.bloco + ' · ' + i.ambiente] || []).push(i); });
+      Object.keys(porLocal).sort().forEach(function (loc) {
+        var marc = porLocal[loc].filter(function (i) { return i.naoEncontrado; }).length;
+        R.secoes.push({ titulo: loc + ' (' + porLocal[loc].length + ' item(ns), ' + marc + ' marcado(s) NÃO ENCONTRADO)',
+          cab: ['Patrimônio / controle', 'Descrição', 'Responsável', 'Situação', 'Marcado por', 'Data'],
+          linhas: porLocal[loc].map(function (i) {
+            return [idItem(i), i.descricao, i.responsavel, i.naoEncontrado ? 'NÃO ENCONTRADO' : 'Ainda não conferido', i.naoEncontradoPor, i.naoEncontradoEm]; }) });
+      });
+      if (!R.secoes.length) R.secoes.push({ titulo: '', cab: ['Patrimônio / controle', 'Descrição', 'Responsável', 'Situação', 'Marcado por', 'Data'], linhas: [] });
     } else {
       R.secoes.push({ titulo: '', cab: ['Patrimônio / controle', 'Descrição', 'Local', 'Motivo da baixa', 'Pedido por', 'Data do pedido'],
         linhas: inv.filter(function (i) { return i.baixa && noBloco(i); }).sort(function (a, c) { return c.baixaTs - a.baixaTs; }).map(function (i) {
@@ -903,6 +941,10 @@
 
   function renderAndamento(a) {
     var h = '';
+    if (a.urlApp) {
+      h += '<div class="cartao"><b>Link do app deste setor</b><div class="ajuda">Envie só este link às pessoas (não o link “script.google.com”). Ele abre direto no seu setor e a câmera funciona.</div>' +
+        '<input type="text" readonly id="inp-link-app" value="' + esc(a.urlApp) + '" style="margin-top:6px"><div style="margin-top:6px"><button class="btn-pequeno" id="btn-copiar-link">Copiar link</button></div></div>';
+    }
     if (a.prazo) {
       var dias = Math.ceil((new Date(a.prazo + 'T23:59:59') - new Date()) / 86400000);
       var cls = dias < 0 ? 'vencido' : (dias <= 7 ? 'alerta' : '');
@@ -942,6 +984,14 @@
     }
     h += '</div>';
     $('andamento-corpo').innerHTML = h;
+    var bc = $('btn-copiar-link');
+    if (bc) bc.addEventListener('click', function () {
+      var inp = $('inp-link-app'); inp.focus(); inp.select();
+      var ok = false;
+      try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(inp.value); ok = true; } } catch (e) { /* tenta o método antigo */ }
+      if (!ok) { try { ok = document.execCommand('copy'); } catch (e) { ok = false; } }
+      toast(ok ? 'Link copiado.' : 'Selecione o link e copie.');
+    });
   }
 
   // ============================================================
@@ -1725,6 +1775,83 @@ function criarLeitorFoto(Html5Qrcode, Html5QrcodeSupportedFormats, idElemento) {
         mostrarTela('tela-scanner'); iniciarScanner();
       }).catch(function (e) { btn.disabled = false; btn.textContent = txt; toast(msgErro(e)); });
   });
+  // ============================================================
+  //  INVENTÁRIO — CONFERÊNCIA DO AMBIENTE (itens não encontrados)
+  // ============================================================
+  estado.confFotos = {};
+  function abrirConferencia() {
+    pararScanner();
+    $('cf-local').textContent = estado.blocoAtual + ' · ' + estado.ambienteAtual;
+    $('cf-corpo').innerHTML = '<div class="carregando-txt">Carregando...</div>';
+    mostrarTela('tela-conferencia');
+    return carregarConferencia();
+  }
+  function carregarConferencia() {
+    return apiA('listarConferenciaLocal', estado.blocoAtual, estado.ambienteAtual).then(function (r) {
+      estado.conf = r; renderConferencia();
+    }).catch(function (e) { $('cf-corpo').innerHTML = '<div class="status-msg erro">' + esc(msgErro(e)) + '</div>'; });
+  }
+  function cardConferencia(i, ja) {
+    var f = estado.confFotos[i.patrimonio];
+    return '<div class="card-item" data-pat="' + esc(i.patrimonio) + '" style="margin-bottom:12px">' +
+      '<div><b>' + esc(i.descricao || '(sem descrição)') + '</b></div>' +
+      '<div class="meta">' + (/^(CTRL|COD)-/.test(i.patrimonio) ? 'Sem patrimônio · Controle <b>' + esc(i.numControle || i.patrimonio) + '</b>' : 'Patrimônio <b>' + esc(i.patrimonio) + '</b>') + (i.codBarras ? ' · Cód. ' + esc(i.codBarras) : '') + '</div>' +
+      (i.responsavel ? '<div class="meta">Responsável: ' + esc(i.responsavel) + '</div>' : '') +
+      (ja ? '<div class="meta"><span class="tag erro">NÃO ENCONTRADO</span> por ' + esc(i.naoEncontradoPor) + ' em ' + esc(i.naoEncontradoEm) + '</div>' : '') +
+      '<label>Foto do item (obrigatória para confirmar)</label>' +
+      '<input type="file" accept="image/*" capture="environment" data-cf-foto="' + esc(i.patrimonio) + '">' +
+      '<div class="cf-prev">' + (f ? '<img src="' + f + '" alt="Prévia da foto">' : '') + '</div>' +
+      '<button class="btn-primario" type="button" data-cf-achei="' + esc(i.patrimonio) + '">Encontrei este item</button>' +
+      (ja ? '' : '<button class="btn-secundario btn-baixa" type="button" data-cf-nao="' + esc(i.patrimonio) + '">NÃO ENCONTRADO</button>') +
+      '</div>';
+  }
+  function renderConferencia() {
+    var r = estado.conf || { pendentes: [], naoEncontrados: [] };
+    var h = '<h3>Para conferir (' + r.pendentes.length + ')</h3>';
+    h += r.pendentes.length ? r.pendentes.map(function (i) { return cardConferencia(i, false); }).join('')
+      : '<div class="cartao">Nenhum item pendente neste ambiente.</div>';
+    if (r.naoEncontrados.length) {
+      h += '<h3>Marcados como NÃO ENCONTRADO (' + r.naoEncontrados.length + ')</h3>' +
+        '<p class="ajuda">Se o item aparecer, tire a foto e confirme que o encontrou.</p>' +
+        r.naoEncontrados.map(function (i) { return cardConferencia(i, true); }).join('');
+    }
+    $('cf-corpo').innerHTML = h;
+  }
+  function confFinalizar(r, msg) {
+    $('progresso-label').textContent = r.progresso.encontrados + '/' + r.progresso.total;
+    toast(msg);
+    return carregarConferencia();
+  }
+  $('btn-conferir-local').addEventListener('click', abrirConferencia);
+  $('cf-voltar').addEventListener('click', function () { mostrarTela('tela-scanner'); iniciarScanner(); });
+  $('cf-corpo').addEventListener('change', function (e) {
+    var pat = e.target.getAttribute && e.target.getAttribute('data-cf-foto');
+    if (!pat || !e.target.files[0]) return;
+    var card = e.target.closest('[data-pat]');
+    reduzirImagem(e.target.files[0], 1280, 0.72).then(function (b64) {
+      estado.confFotos[pat] = b64;
+      card.querySelector('.cf-prev').innerHTML = '<img src="' + b64 + '" alt="Prévia da foto">';
+    }).catch(function (er) { toast(msgErro(er)); });
+  });
+  $('cf-corpo').addEventListener('click', function (e) {
+    var achei = e.target.getAttribute && e.target.getAttribute('data-cf-achei');
+    var nao = e.target.getAttribute && e.target.getAttribute('data-cf-nao');
+    if (achei) {
+      if (!estado.confFotos[achei]) { toast('Tire a foto do item para confirmar que o encontrou.'); return; }
+      e.target.disabled = true;
+      apiA('conferirItemLocal', achei, estado.blocoAtual, estado.ambienteAtual, true, estado.confFotos[achei]).then(function (r) {
+        delete estado.confFotos[achei]; return confFinalizar(r, 'Item confirmado!');
+      }).catch(function (er) { e.target.disabled = false; toast(msgErro(er)); });
+    } else if (nao) {
+      var it = (estado.conf.pendentes.filter(function (x) { return x.patrimonio === nao; })[0]) || {};
+      if (!confirm('Marcar como NÃO ENCONTRADO?\n\n' + (it.descricao || nao))) return;
+      e.target.disabled = true;
+      apiA('conferirItemLocal', nao, estado.blocoAtual, estado.ambienteAtual, false, '').then(function (r) {
+        return confFinalizar(r, 'Marcado como não encontrado.');
+      }).catch(function (er) { e.target.disabled = false; toast(msgErro(er)); });
+    }
+  });
+
   $('btn-nao-e-este').addEventListener('click', function () { mostrarTela('tela-scanner'); iniciarScanner(); });
 
   $('btn-registrar-nc').addEventListener('click', function () {
