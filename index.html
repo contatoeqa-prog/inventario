@@ -569,7 +569,7 @@
   // funciona assim) que chama o Apps Script por fetch; o endereço do setor vem em ?api=... e fica salvo no aparelho.
   var MODO_EXTERNO = (typeof google === 'undefined' || !google.script || !google.script.run);
   var API_URL = '';
-  var API_PADRAO = 'https://script.google.com/macros/s/AKfycbymGhvNuoH1Ak9nFlCByQ48uQ2aEi8xjpZoeGJ49Qnb1h6pHTi0JfobKQ4cPSRbE_hI/exec';   // preenchido pelo build_static.py --api LINK (página já vem apontando para o setor)
+  var API_PADRAO = 'https://script.google.com/macros/s/AKfycbzMWu4HuEnBvMz6ZF81vfZ_6dB9gVKT71t1pH31ivp3XDmchcMUI2i87SBBaG4cMOg7/exec';   // preenchido pelo build_static.py --api LINK (página já vem apontando para o setor)
   function lerApiUrl() {
     try {
       var q = new URLSearchParams(location.search).get('api');
@@ -1801,7 +1801,7 @@ function criarLeitorFoto(Html5Qrcode, Html5QrcodeSupportedFormats, idElemento) {
       '<label>Foto do item (obrigatória para confirmar)</label>' +
       '<input type="file" accept="image/*" capture="environment" data-cf-foto="' + esc(i.patrimonio) + '">' +
       '<div class="cf-prev">' + (f ? '<img src="' + f + '" alt="Prévia da foto">' : '') + '</div>' +
-      '<button class="btn-primario" type="button" data-cf-achei="' + esc(i.patrimonio) + '">Encontrei este item</button>' +
+      '<button class="btn-primario" type="button" data-cf-achei="' + esc(i.patrimonio) + '">' + (f ? 'Confirmar que encontrei (com esta foto)' : 'Encontrei: tirar a foto') + '</button>' +
       (ja ? '' : '<button class="btn-secundario btn-baixa" type="button" data-cf-nao="' + esc(i.patrimonio) + '">NÃO ENCONTRADO</button>') +
       '</div>';
   }
@@ -1831,13 +1831,18 @@ function criarLeitorFoto(Html5Qrcode, Html5QrcodeSupportedFormats, idElemento) {
     reduzirImagem(e.target.files[0], 1280, 0.72).then(function (b64) {
       estado.confFotos[pat] = b64;
       card.querySelector('.cf-prev').innerHTML = '<img src="' + b64 + '" alt="Prévia da foto">';
+      var bt = card.querySelector('[data-cf-achei]'); if (bt) bt.textContent = 'Confirmar que encontrei (com esta foto)';
     }).catch(function (er) { toast(msgErro(er)); });
   });
   $('cf-corpo').addEventListener('click', function (e) {
     var achei = e.target.getAttribute && e.target.getAttribute('data-cf-achei');
     var nao = e.target.getAttribute && e.target.getAttribute('data-cf-nao');
     if (achei) {
-      if (!estado.confFotos[achei]) { toast('Tire a foto do item para confirmar que o encontrou.'); return; }
+      if (!estado.confFotos[achei]) {      // sem foto: abre a câmera; depois da foto, toque de novo para confirmar
+        toast('Tire a foto do item para confirmar que o encontrou.');
+        var inp = e.target.closest('[data-pat]').querySelector('input[type=file]'); if (inp) inp.click();
+        return;
+      }
       e.target.disabled = true;
       apiA('conferirItemLocal', achei, estado.blocoAtual, estado.ambienteAtual, true, estado.confFotos[achei]).then(function (r) {
         delete estado.confFotos[achei]; return confFinalizar(r, 'Item confirmado!');
